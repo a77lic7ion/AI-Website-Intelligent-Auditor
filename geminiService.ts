@@ -3,14 +3,14 @@ import { AiAnalysis, AuditReport } from '../types';
 
 // This is a mock service. In a real application, this would make an API call
 // to a backend that uses the Gemini API.
-export const getAuditAnalysis = (report: AuditReport): Promise<AiAnalysis> => {
-    console.log("Generating AI analysis for report with score:", report.score);
+export const getAuditAnalysis = (report: AuditReport, url: string): Promise<AiAnalysis> => {
+    console.log(`Generating AI analysis for ${url} with score:`, report.score);
     
     // Simulate network delay
     return new Promise(resolve => {
         setTimeout(() => {
             const analysis: AiAnalysis = {
-                summary: "This website has several critical issues impacting its health score. The most pressing is missing alt text on images, which affects accessibility and SEO. Slow loading speed is another significant concern, potentially leading to poor user experience and lower search engine rankings.",
+                summary: `The audit for ${url} has revealed several critical issues impacting its health score. The most pressing is missing alt text on images, which affects accessibility and SEO. Slow loading speed is another significant concern, potentially leading to poor user experience and lower search engine rankings.`,
                 prioritizedActionPlan: [
                     {
                         title: "Fix Missing Alt Text",

@@ -1,14 +1,15 @@
 import React from 'react';
 import { DashboardIcon, ReportsIcon, IntegrationsIcon, SettingsIcon, LogoutIcon } from './icons';
-import { Page } from '../types';
+import { Page, User } from '../types';
 
 interface SidebarProps {
     activePage: Page;
     onNavigate: (page: Page) => void;
     onLogout: () => void;
+    currentUser: User | null;
 }
 
-const Sidebar: React.FC<SidebarProps> = ({ activePage, onNavigate, onLogout }) => {
+const Sidebar: React.FC<SidebarProps> = ({ activePage, onNavigate, onLogout, currentUser }) => {
     return (
         <div className="w-64 bg-white dark:bg-auditor-dark border-r border-gray-200 dark:border-auditor-border flex flex-col p-4">
             <div className="flex items-center space-x-3 mb-10 px-2">
@@ -29,8 +30,8 @@ const Sidebar: React.FC<SidebarProps> = ({ activePage, onNavigate, onLogout }) =
                  <div className="flex items-center space-x-3 p-2">
                     <img src="https://picsum.photos/id/237/200/200" alt="User Avatar" className="h-10 w-10 rounded-full" />
                     <div>
-                        <p className="font-semibold text-gray-900 dark:text-auditor-text-primary">Alex Johnson</p>
-                        <p className="text-sm text-gray-500 dark:text-auditor-text-secondary">alex.j@example.com</p>
+                        <p className="font-semibold text-gray-900 dark:text-auditor-text-primary truncate">{currentUser?.fullName}</p>
+                        <p className="text-sm text-gray-500 dark:text-auditor-text-secondary truncate">{currentUser?.email}</p>
                     </div>
                     <button onClick={onLogout} className="ml-auto text-gray-500 dark:text-auditor-text-secondary hover:text-gray-900 dark:hover:text-auditor-text-primary" aria-label="Logout">
                         <LogoutIcon className="h-5 w-5" />

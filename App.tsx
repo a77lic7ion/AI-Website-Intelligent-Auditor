@@ -6,12 +6,18 @@ import Settings from './components/Settings';
 import Integrations from './components/Integrations';
 import Reports from './components/Reports';
 import Login from './components/Login';
-import { Page, Theme } from './types';
+import SignUp from './components/SignUp';
+import NewAuditModal from './components/NewAuditModal';
+import { Page, Theme, User } from './types';
 
 const App: React.FC = () => {
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [authPage, setAuthPage] = useState<'login' | 'signup'>('login');
   const [activePage, setActivePage] = useState<Page>('Dashboard');
   const [theme, setTheme] = useState<Theme>(() => (localStorage.getItem('theme') as Theme) || 'system');
+  const [auditTrigger, setAuditTrigger] = useState(0);
+  const [isNewAuditModalOpen, setIsNewAuditModalOpen] = useState(false);
+  const [auditedUrl, setAuditedUrl] = useState('https://example-audited-site.com');
 
   useEffect(() => {
     const root = window.document.documentElement;
@@ -30,20 +36,33 @@ const App: React.FC = () => {
     return () => mediaQuery.removeEventListener('change', handleChange);
   }, [theme]);
 
-  const handleLoginSuccess = () => {
-    setIsAuthenticated(true);
+  const handleLoginSuccess = (user: { email: string; fullName: string; }) => {
+    const isPro = user.email.toLowerCase() === 'shaunwg@outlook.com';
+    setCurrentUser({ ...user, isPro });
   };
 
   const handleLogout = () => {
-    setIsAuthenticated(false);
+    setCurrentUser(null);
+    setAuthPage('login'); // Reset to login page on logout
+  };
+
+  const handleStartAudit = (url: string) => {
+    setAuditedUrl(url);
+    setAuditTrigger(prev => prev + 1);
+    setIsNewAuditModalOpen(false);
+    setActivePage('Dashboard'); // Switch to dashboard to see results
   };
   
-  if (!isAuthenticated) {
-    return <Login onLoginSuccess={handleLoginSuccess} />;
+  if (!currentUser) {
+    if (authPage === 'login') {
+      return <Login onLoginSuccess={handleLoginSuccess} onSwitchToSignUp={() => setAuthPage('signup')} />;
+    } else {
+      return <SignUp onLoginSuccess={handleLoginSuccess} onSwitchToLogin={() => setAuthPage('login')} />;
+    }
   }
 
   const pageDetails = {
-    Dashboard: { title: 'Website Audit Results', subtitle: 'Last updated: 2024-01-15' },
+    Dashboard: { title: 'Website Audit Results', subtitle: `Results for ${auditedUrl}` },
     Reports: { title: 'Reports', subtitle: 'View and export your audit reports' },
     Integrations: { title: 'Integrations', subtitle: 'Connect with other services' },
     Settings: { title: 'Settings', subtitle: 'Manage your account and preferences' },
@@ -52,7 +71,7 @@ const App: React.FC = () => {
   const renderContent = () => {
     switch (activePage) {
       case 'Dashboard':
-        return <Dashboard />;
+        return <Dashboard currentUser={currentUser} auditTrigger={auditTrigger} auditedUrl={auditedUrl} />;
       case 'Reports':
         return <Reports />;
       case 'Settings':
@@ -65,15 +84,26 @@ const App: React.FC = () => {
   };
 
   return (
-    <div className="flex h-screen bg-gray-50 dark:bg-auditor-dark text-gray-900 dark:text-auditor-text-primary font-sans">
-      <Sidebar activePage={activePage} onNavigate={setActivePage} onLogout={handleLogout} />
-      <div className="flex flex-col flex-1">
-        <Header title={pageDetails[activePage].title} subtitle={pageDetails[activePage].subtitle} />
-        <main className="flex-1 p-6 lg:p-8 overflow-y-auto">
-          {renderContent()}
-        </main>
+    <>
+      <div className="flex h-screen bg-gray-50 dark:bg-auditor-dark text-gray-900 dark:text-auditor-text-primary font-sans">
+        <Sidebar activePage={activePage} onNavigate={setActivePage} onLogout={handleLogout} currentUser={currentUser} />
+        <div className="flex flex-col flex-1">
+          <Header 
+            title={pageDetails[activePage].title} 
+            subtitle={pageDetails[activePage].subtitle} 
+            onNewAuditClick={() => setIsNewAuditModalOpen(true)} 
+          />
+          <main className="flex-1 p-6 lg:p-8 overflow-y-auto">
+            {renderContent()}
+          </main>
+        </div>
       </div>
-    </div>
+      <NewAuditModal 
+        isOpen={isNewAuditModalOpen}
+        onClose={() => setIsNewAuditModalOpen(false)}
+        onStartAudit={handleStartAudit}
+      />
+    </>
   );
 };
 

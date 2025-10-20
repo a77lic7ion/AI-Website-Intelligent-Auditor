@@ -1,14 +1,22 @@
 
 import React, { useState, useEffect } from 'react';
 import { MOCK_AUDIT_REPORT } from '../constants';
-import { AiAnalysis, AuditReport, Issue, IssueSeverity } from '../types';
+import { AiAnalysis, AuditReport, Issue, IssueSeverity, User } from '../types';
 import ScoreGauge from './ScoreGauge';
 import LockedFeatureCard from './LockedFeatureCard';
+import PrioritizedActionPlan from './PrioritizedActionPlan';
+import SuggestedSnippets from './SuggestedSnippets';
 import { getAuditAnalysis } from '../geminiService';
-import { GeminiIcon, LockIcon } from './icons';
+import { GeminiIcon } from './icons';
 
 
-const Dashboard: React.FC = () => {
+interface DashboardProps {
+    currentUser: User;
+    auditTrigger: number;
+    auditedUrl: string;
+}
+
+const Dashboard: React.FC<DashboardProps> = ({ currentUser, auditTrigger, auditedUrl }) => {
     const [report] = useState<AuditReport>(MOCK_AUDIT_REPORT);
     const [analysis, setAnalysis] = useState<AiAnalysis | null>(null);
     const [loading, setLoading] = useState<boolean>(true);
@@ -16,8 +24,10 @@ const Dashboard: React.FC = () => {
     useEffect(() => {
         const fetchAnalysis = async () => {
             setLoading(true);
+            setAnalysis(null);
             try {
-                const result = await getAuditAnalysis(report);
+                // In a real app, you'd pass the auditedUrl to the service
+                const result = await getAuditAnalysis(report, auditedUrl);
                 setAnalysis(result);
             } catch (error) {
                 console.error("Failed to get AI analysis:", error);
@@ -26,8 +36,7 @@ const Dashboard: React.FC = () => {
             }
         };
         fetchAnalysis();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [report]);
+    }, [report, auditTrigger, auditedUrl]);
 
     const criticalIssues = report.issues.filter(issue => issue.severity === IssueSeverity.High || issue.severity === IssueSeverity.Medium).slice(0, 3);
 
@@ -56,12 +65,14 @@ const Dashboard: React.FC = () => {
                     ) : (
                         <p className="text-gray-500 dark:text-auditor-text-secondary text-sm leading-relaxed">{analysis?.summary}</p>
                     )}
-                    <div className="mt-4 p-3 bg-auditor-primary/10 rounded-lg flex items-center space-x-3">
-                        <input type="radio" checked readOnly className="form-radio h-4 w-4 text-auditor-primary bg-gray-100 dark:bg-auditor-card border-gray-300 dark:border-auditor-border" />
-                        <label className="text-sm text-gray-500 dark:text-auditor-text-secondary">
-                            <span className="font-semibold text-gray-900 dark:text-auditor-text-primary">Paid Feature:</span> Get a detailed, line-by-line breakdown and actionable insights.
-                        </label>
-                    </div>
+                    {!currentUser.isPro && (
+                        <div className="mt-4 p-3 bg-auditor-primary/10 rounded-lg flex items-center space-x-3">
+                            <input type="radio" checked readOnly className="form-radio h-4 w-4 text-auditor-primary bg-gray-100 dark:bg-auditor-card border-gray-300 dark:border-auditor-border" />
+                            <label className="text-sm text-gray-500 dark:text-auditor-text-secondary">
+                                <span className="font-semibold text-gray-900 dark:text-auditor-text-primary">Paid Feature:</span> Get a detailed, line-by-line breakdown and actionable insights.
+                            </label>
+                        </div>
+                    )}
                 </div>
             </div>
 
@@ -91,16 +102,24 @@ const Dashboard: React.FC = () => {
 
             {/* AI-Powered Solutions */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <LockedFeatureCard 
-                    title="Prioritized Action Plan" 
-                    icon={<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-6 w-6"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>}
-                    description="AI-generated step-by-step plan to tackle the most critical issues first, saving you time and effort."
-                />
-                <LockedFeatureCard
-                    title="Suggested HTML Snippets"
-                    icon={<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-6 w-6"><polyline points="16 18 22 12 16 6"></polyline><polyline points="8 6 2 12 8 18"></polyline></svg>}
-                    description="Get auto-generated code snippets to fix issues like missing meta tags, incorrect schema, and more."
-                />
+                {currentUser.isPro && analysis ? (
+                    <PrioritizedActionPlan plan={analysis.prioritizedActionPlan} />
+                ) : (
+                    <LockedFeatureCard 
+                        title="Prioritized Action Plan" 
+                        icon={<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-6 w-6"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>}
+                        description="AI-generated step-by-step plan to tackle the most critical issues first, saving you time and effort."
+                    />
+                )}
+                {currentUser.isPro && analysis ? (
+                    <SuggestedSnippets snippets={analysis.suggestedSnippets} />
+                ) : (
+                    <LockedFeatureCard
+                        title="Suggested HTML Snippets"
+                        icon={<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-6 w-6"><polyline points="16 18 22 12 16 6"></polyline><polyline points="8 6 2 12 8 18"></polyline></svg>}
+                        description="Get auto-generated code snippets to fix issues like missing meta tags, incorrect schema, and more."
+                    />
+                )}
             </div>
         </div>
     );

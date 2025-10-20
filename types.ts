@@ -49,5 +49,11 @@ export interface AiAnalysis {
   }[];
 }
 
+export interface User {
+    fullName: string;
+    email: string;
+    isPro: boolean;
+}
+
 export type Page = 'Dashboard' | 'Reports' | 'Integrations' | 'Settings';
 export type Theme = 'light' | 'dark' | 'system';

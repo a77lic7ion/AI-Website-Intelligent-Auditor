@@ -1,8 +1,8 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 
-interface LoginProps {
+interface SignUpProps {
     onLoginSuccess: (user: { email: string; fullName: string; }) => void;
-    onSwitchToSignUp: () => void;
+    onSwitchToLogin: () => void;
 }
 
 // Add a global declaration for the google object from the GSI client script
@@ -12,9 +12,11 @@ declare global {
   }
 }
 
-const Login: React.FC<LoginProps> = ({ onLoginSuccess, onSwitchToSignUp }) => {
+const SignUp: React.FC<SignUpProps> = ({ onLoginSuccess, onSwitchToLogin }) => {
+    const [fullName, setFullName] = useState('');
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
+    const [confirmPassword, setConfirmPassword] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const googleButtonRef = useRef<HTMLDivElement>(null);
 
@@ -28,16 +30,17 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess, onSwitchToSignUp }) => {
     }, [password]);
 
     const isPasswordValid = Object.values(passwordValidation).every(Boolean);
+    const passwordsMatch = password === confirmPassword && password !== '';
 
-    const handleLogin = (e: React.FormEvent) => {
+    const handleSignUp = (e: React.FormEvent) => {
         e.preventDefault();
-        if (!email || !isPasswordValid) return;
+        if (!email || !isPasswordValid || !passwordsMatch || !fullName) return;
         
         setIsLoading(true);
-        // Simulate API call
+        // Simulate API call for registration
         setTimeout(() => {
             setIsLoading(false);
-            onLoginSuccess({ email, fullName: 'Pro User' });
+            onLoginSuccess({ email, fullName }); // Log user in immediately after successful sign-up
         }, 1000);
     };
     
@@ -48,9 +51,9 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess, onSwitchToSignUp }) => {
             window.google.accounts.id.initialize({
                 client_id: '826553413421-r56gj6et4tcn1gkm0un2dhlicrdcs1pb.apps.googleusercontent.com',
                 callback: (response: any) => {
-                    console.log("Google Sign-In successful");
+                    console.log("Google Sign-Up successful");
                     setIsLoading(true);
-                    setTimeout(() => { // Simulate backend verification delay
+                    setTimeout(() => {
                         setIsLoading(false);
                         onLoginSuccess({ email: 'shaunwg@outlook.com', fullName: 'Shaun Wg' });
                     }, 500);
@@ -64,7 +67,7 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess, onSwitchToSignUp }) => {
                     size: "large",
                     type: "standard",
                     shape: "rectangular",
-                    text: "signin_with",
+                    text: "signup_with",
                     logo_alignment: "left",
                 } 
             );
@@ -92,11 +95,24 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess, onSwitchToSignUp }) => {
                 </div>
                 
                 <div className="bg-white dark:bg-auditor-card border border-gray-200 dark:border-auditor-border rounded-lg shadow-lg p-8">
-                    <h2 className="text-xl font-semibold text-center text-gray-900 dark:text-auditor-text-primary mb-1">Welcome Back</h2>
-                    <p className="text-sm text-center text-gray-500 dark:text-auditor-text-secondary mb-6">Sign in to continue</p>
+                    <h2 className="text-xl font-semibold text-center text-gray-900 dark:text-auditor-text-primary mb-1">Create an Account</h2>
+                    <p className="text-sm text-center text-gray-500 dark:text-auditor-text-secondary mb-6">Start your website audit journey</p>
                     
-                    <form onSubmit={handleLogin} className="space-y-4">
+                    <form onSubmit={handleSignUp} className="space-y-4">
                         <div>
+                            <label htmlFor="fullName" className="block text-sm font-medium text-gray-500 dark:text-auditor-text-secondary mb-2">Full Name</label>
+                            <input
+                                id="fullName"
+                                name="fullName"
+                                type="text"
+                                autoComplete="name"
+                                required
+                                value={fullName}
+                                onChange={(e) => setFullName(e.target.value)}
+                                className="w-full bg-gray-50 dark:bg-auditor-dark border border-gray-300 dark:border-auditor-border rounded-md px-3 py-2 text-gray-900 dark:text-auditor-text-primary focus:outline-none focus:ring-2 focus:ring-auditor-primary"
+                            />
+                        </div>
+                         <div>
                             <label htmlFor="email" className="block text-sm font-medium text-gray-500 dark:text-auditor-text-secondary mb-2">Email Address</label>
                             <input
                                 id="email"
@@ -111,22 +127,19 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess, onSwitchToSignUp }) => {
                         </div>
 
                         <div>
-                            <div className="flex justify-between items-center mb-2">
-                                <label htmlFor="password"className="block text-sm font-medium text-gray-500 dark:text-auditor-text-secondary">Password</label>
-                                <a href="#" className="text-sm font-medium text-auditor-primary hover:underline">Forgot?</a>
-                            </div>
+                            <label htmlFor="password"className="block text-sm font-medium text-gray-500 dark:text-auditor-text-secondary mb-2">Password</label>
                             <input
                                 id="password"
                                 name="password"
                                 type="password"
-                                autoComplete="current-password"
+                                autoComplete="new-password"
                                 required
                                 value={password}
                                 onChange={(e) => setPassword(e.target.value)}
                                 className="w-full bg-gray-50 dark:bg-auditor-dark border border-gray-300 dark:border-auditor-border rounded-md px-3 py-2 text-gray-900 dark:text-auditor-text-primary focus:outline-none focus:ring-2 focus:ring-auditor-primary"
                             />
                         </div>
-
+                        
                         {password.length > 0 && (
                             <div className="grid grid-cols-2 gap-x-4 gap-y-1 mt-2">
                                 <ValidationCheck isValid={passwordValidation.length} text="8+ characters" />
@@ -136,8 +149,23 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess, onSwitchToSignUp }) => {
                             </div>
                         )}
 
-                        <button type="submit" disabled={isLoading || !email || !isPasswordValid} className="w-full flex justify-center bg-auditor-primary hover:bg-blue-600 text-white font-semibold px-4 py-2 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
-                            {isLoading ? 'Signing In...' : 'Sign In'}
+                        <div>
+                            <label htmlFor="confirmPassword"className="block text-sm font-medium text-gray-500 dark:text-auditor-text-secondary mb-2">Confirm Password</label>
+                            <input
+                                id="confirmPassword"
+                                name="confirmPassword"
+                                type="password"
+                                autoComplete="new-password"
+                                required
+                                value={confirmPassword}
+                                onChange={(e) => setConfirmPassword(e.target.value)}
+                                className={`w-full bg-gray-50 dark:bg-auditor-dark border rounded-md px-3 py-2 text-gray-900 dark:text-auditor-text-primary focus:outline-none focus:ring-2 focus:ring-auditor-primary ${confirmPassword.length > 0 && !passwordsMatch ? 'border-severity-high' : 'border-gray-300 dark:border-auditor-border'}`}
+                            />
+                            {confirmPassword.length > 0 && !passwordsMatch && <p className="text-xs text-severity-high mt-1">Passwords do not match.</p>}
+                        </div>
+
+                        <button type="submit" disabled={isLoading || !isPasswordValid || !passwordsMatch || !email || !fullName} className="w-full flex justify-center bg-auditor-primary hover:bg-blue-600 text-white font-semibold px-4 py-2 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+                            {isLoading ? 'Creating Account...' : 'Sign Up'}
                         </button>
                     </form>
 
@@ -161,11 +189,11 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess, onSwitchToSignUp }) => {
                 </div>
 
                 <p className="text-center text-sm text-gray-500 dark:text-auditor-text-secondary mt-6">
-                    Don't have an account? <button onClick={onSwitchToSignUp} className="font-medium text-auditor-primary hover:underline">Sign Up</button>
+                    Already have an account? <button onClick={onSwitchToLogin} className="font-medium text-auditor-primary hover:underline">Sign In</button>
                 </p>
             </div>
         </div>
     );
 };
 
-export default Login;
+export default SignUp;
