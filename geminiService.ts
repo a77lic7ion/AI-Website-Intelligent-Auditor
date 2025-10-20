@@ -1,25 +1,38 @@
 import { GoogleGenAI, GenerateContentResponse, Type } from "@google/genai";
 import { AiProvider, AuditReportData } from './types';
 
-export const testApiKey = async (provider: AiProvider, apiKey: string): Promise<boolean> => {
-    if (!apiKey) return false;
+export const testApiKey = async (provider: AiProvider, apiKey: string): Promise<void> => {
+    if (!apiKey && provider !== AiProvider.OLLAMA) {
+        throw new Error("API Key is required.");
+    }
 
     if (provider === AiProvider.GEMINI) {
         try {
             const ai = new GoogleGenAI({ apiKey });
-            const response = await ai.models.generateContent({
-                model: 'gem-ini-2.5-flash',
+            await ai.models.generateContent({
+                model: 'gemini-2.5-flash', // Corrected model name
                 contents: 'test',
             });
-            return !!response.text;
+            // Success is implied by not throwing an error
         } catch (error) {
             console.error("Gemini API key test failed:", error);
-            return false;
+            if (error instanceof Error && (error.message.includes('API key') || error.message.includes('invalid'))) {
+                throw new Error("The provided Gemini API Key appears to be invalid.");
+            }
+            throw new Error("Connection failed. The API might be unavailable or there could be a network issue.");
         }
+    } else {
+        // Mock for other providers with simple validation
+        return new Promise((resolve, reject) => 
+            setTimeout(() => {
+                if (apiKey.length > 5) {
+                    resolve();
+                } else {
+                    reject(new Error(`The ${provider} API Key seems too short.`));
+                }
+            }, 500)
+        );
     }
-    
-    // Mock for other providers
-    return new Promise(resolve => setTimeout(() => resolve(true), 500));
 };
 
 const PROMPT = `

@@ -12,7 +12,13 @@ interface SettingsProps {
 
 const Settings: React.FC<SettingsProps> = ({ currentUser, theme, onThemeChange, apiKeys, onSaveApiKeys }) => {
     const [localKeys, setLocalKeys] = useState(apiKeys);
-    const [testResults, setTestResults] = useState<Record<AiProvider, 'testing' | 'success' | 'failed' | null>>({
+    const [testStatus, setTestStatus] = useState<Record<AiProvider, 'testing' | 'success' | 'failed' | null>>({
+        [AiProvider.GEMINI]: null,
+        [AiProvider.OPENAI]: null,
+        [AiProvider.MISTRAL]: null,
+        [AiProvider.OLLAMA]: null,
+    });
+    const [testError, setTestError] = useState<Record<AiProvider, string | null>>({
         [AiProvider.GEMINI]: null,
         [AiProvider.OPENAI]: null,
         [AiProvider.MISTRAL]: null,
@@ -21,7 +27,8 @@ const Settings: React.FC<SettingsProps> = ({ currentUser, theme, onThemeChange, 
     
     const handleKeyChange = (provider: AiProvider, value: string) => {
         setLocalKeys(prev => ({ ...prev, [provider]: value }));
-        setTestResults(prev => ({ ...prev, [provider]: null })); // Reset test status on change
+        setTestStatus(prev => ({ ...prev, [provider]: null })); // Reset test status on change
+        setTestError(prev => ({ ...prev, [provider]: null }));
     };
 
     const handleSave = () => {
@@ -30,11 +37,21 @@ const Settings: React.FC<SettingsProps> = ({ currentUser, theme, onThemeChange, 
     };
 
     const handleTestKey = async (provider: AiProvider) => {
-        setTestResults(prev => ({ ...prev, [provider]: 'testing' }));
+        setTestStatus(prev => ({ ...prev, [provider]: 'testing' }));
+        setTestError(prev => ({ ...prev, [provider]: null }));
         const keyToTest = localKeys[provider];
         
-        const isValid = await testApiKey(provider, keyToTest);
-        setTestResults(prev => ({ ...prev, [provider]: isValid ? 'success' : 'failed' }));
+        try {
+            await testApiKey(provider, keyToTest);
+            setTestStatus(prev => ({ ...prev, [provider]: 'success' }));
+        } catch (error) {
+            setTestStatus(prev => ({ ...prev, [provider]: 'failed' }));
+            if (error instanceof Error) {
+                setTestError(prev => ({ ...prev, [provider]: error.message }));
+            } else {
+                setTestError(prev => ({ ...prev, [provider]: "An unknown error occurred." }));
+            }
+        }
     };
 
     return (
@@ -80,11 +97,11 @@ const Settings: React.FC<SettingsProps> = ({ currentUser, theme, onThemeChange, 
                                     className="flex-grow bg-gray-50 dark:bg-auditor-dark border border-gray-300 dark:border-auditor-border rounded-md px-3 py-2 text-gray-900 dark:text-auditor-text-primary focus:outline-none focus:ring-2 focus:ring-auditor-primary"
                                 />
                                 <button onClick={() => handleTestKey(provider)} className="px-4 py-2 text-sm font-semibold text-gray-700 dark:text-auditor-text-secondary bg-white dark:bg-auditor-card hover:bg-gray-100 dark:hover:bg-auditor-border border border-gray-300 dark:border-auditor-border rounded-md transition-colors">
-                                    {testResults[provider] === 'testing' ? 'Testing...' : 'Test'}
+                                    {testStatus[provider] === 'testing' ? 'Testing...' : 'Test'}
                                 </button>
                             </div>
-                            {testResults[provider] === 'success' && <p className="text-xs text-auditor-secondary mt-1">Connection successful!</p>}
-                            {testResults[provider] === 'failed' && <p className="text-xs text-severity-high mt-1">Connection failed. Please check your key/URL and network.</p>}
+                            {testStatus[provider] === 'success' && <p className="text-xs text-auditor-secondary mt-1">Connection successful!</p>}
+                            {testStatus[provider] === 'failed' && <p className="text-xs text-severity-high mt-1">{testError[provider] || 'Connection failed.'}</p>}
                         </div>
                     ))}
                 </div>
