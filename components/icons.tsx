@@ -20,9 +20,9 @@ import {
     MdCode,
     MdContentCopy,
     MdError
-} from 'react-icons/md';
-import { FaGithub, FaSlack, FaJira } from 'react-icons/fa';
-import { SiVercel } from 'react-icons/si';
+} from 'react-icons-md';
+import { FaGithub, FaSlack, FaJira } from 'react-icons-fa';
+import { SiVercel } from 'react-icons-si';
 
 
 interface IconProps {
