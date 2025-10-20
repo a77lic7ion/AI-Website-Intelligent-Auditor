@@ -1,14 +1,21 @@
-import React, { useState, useMemo } from 'react';
-import { GoogleIcon } from './icons';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 
 interface LoginProps {
     onLoginSuccess: () => void;
+}
+
+// Add a global declaration for the google object from the GSI client script
+declare global {
+  interface Window {
+    google: any;
+  }
 }
 
 const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [isLoading, setIsLoading] = useState(false);
+    const googleButtonRef = useRef<HTMLDivElement>(null);
 
     const passwordValidation = useMemo(() => {
         return {
@@ -33,14 +40,39 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
         }, 1000);
     };
     
-    const handleGoogleLogin = () => {
-        setIsLoading(true);
-         // Simulate API call
-        setTimeout(() => {
-            setIsLoading(false);
-            onLoginSuccess();
-        }, 1000);
-    }
+    useEffect(() => {
+        if (window.google && googleButtonRef.current) {
+            const isDarkMode = document.documentElement.classList.contains('dark');
+            
+            window.google.accounts.id.initialize({
+                client_id: '826553413421-r56gj6et4tcn1gkm0un2dhlicrdcs1pb.apps.googleusercontent.com',
+                callback: (response: any) => {
+                    // In a real app, you would send the response.credential JWT to your backend
+                    // for verification and to create a session for the user.
+                    // For this mock, we'll just proceed to the dashboard.
+                    console.log("Google Sign-In successful");
+                    setIsLoading(true);
+                    setTimeout(() => { // Simulate backend verification delay
+                        setIsLoading(false);
+                        onLoginSuccess();
+                    }, 500);
+                }
+            });
+
+            window.google.accounts.id.renderButton(
+                googleButtonRef.current,
+                { 
+                    theme: isDarkMode ? "filled_black" : "outline", 
+                    size: "large",
+                    type: "standard",
+                    shape: "rectangular",
+                    text: "signin_with",
+                    logo_alignment: "left",
+                } 
+            );
+        }
+    }, [onLoginSuccess]);
+
 
     const ValidationCheck: React.FC<{isValid: boolean; text: string}> = ({ isValid, text }) => (
         <div className={`flex items-center text-xs ${isValid ? 'text-auditor-secondary' : 'text-auditor-text-secondary'}`}>
@@ -120,10 +152,13 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
                         </div>
                     </div>
 
-                    <button onClick={handleGoogleLogin} disabled={isLoading} className="w-full flex items-center justify-center space-x-2 bg-white dark:bg-auditor-card hover:bg-gray-100 dark:hover:bg-auditor-dark text-gray-900 dark:text-auditor-text-primary font-semibold px-4 py-2 rounded-lg transition-colors border border-gray-300 dark:border-auditor-border disabled:opacity-50 disabled:cursor-not-allowed">
-                        <GoogleIcon className="h-5 w-5" />
-                        <span>Sign in with Google</span>
-                    </button>
+                    <div className="w-full flex justify-center">
+                       {isLoading ? (
+                           <span className="text-sm text-gray-500 dark:text-auditor-text-secondary">Please wait...</span>
+                       ) : (
+                           <div ref={googleButtonRef}></div>
+                       )}
+                    </div>
 
                 </div>
 
