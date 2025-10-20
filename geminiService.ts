@@ -1,16 +1,14 @@
-
 import { GoogleGenAI, GenerateContentResponse, Type } from "@google/genai";
 import { AiProvider, AuditReportData } from './types';
 
-// FIX: This function is updated to align with API key guidelines.
-// For Gemini, it tests the centrally configured key from process.env.API_KEY.
-// For other providers, it uses the key from the UI for testing purposes.
-export const testApiKey = async (provider: AiProvider, apiKey?: string): Promise<boolean> => {
+export const testApiKey = async (provider: AiProvider, apiKey: string): Promise<boolean> => {
+    if (!apiKey) return false;
+
     if (provider === AiProvider.GEMINI) {
         try {
-            const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+            const ai = new GoogleGenAI({ apiKey });
             const response = await ai.models.generateContent({
-                model: 'gemini-2.5-flash',
+                model: 'gem-ini-2.5-flash',
                 contents: 'test',
             });
             return !!response.text;
@@ -19,8 +17,7 @@ export const testApiKey = async (provider: AiProvider, apiKey?: string): Promise
             return false;
         }
     }
-
-    if (!apiKey) return false;
+    
     // Mock for other providers
     return new Promise(resolve => setTimeout(() => resolve(true), 500));
 };
@@ -60,60 +57,33 @@ Prioritize the most critical issues. The action plan should list the top 2-3 mos
 Do not include any text, markdown, or JSON object markers before or after the JSON object.
 `;
 
-// FIX: This function is updated to align with API key guidelines.
-// The apiKey parameter is removed for Gemini, and process.env.API_KEY is used directly.
-export const runAudit = async (url: string, provider: AiProvider): Promise<AuditReportData> => {
+export const runAudit = async (url: string, provider: AiProvider, apiKey: string): Promise<AuditReportData> => {
     if (provider !== AiProvider.GEMINI) {
-        // Mocking for other providers
         console.warn(`Audit for ${provider} is not implemented. Returning mock data.`);
-        return new Promise(resolve => setTimeout(() => resolve({
-            score: 78,
-            issues: [
-                { id: 'mock-1', severity: 'High', title: 'Mock Issue 1', description: 'This is a mock issue.', recommendation: 'This is a mock recommendation.' },
-                { id: 'mock-2', severity: 'Medium', title: 'Mock Issue 2', description: 'This is a mock issue.', recommendation: 'This is a mock recommendation.' },
-            ],
-            actionPlan: [{ title: 'Mock Action', description: 'Do the mock thing.' }],
-            snippets: [{ title: 'Mock Snippet', description: 'A mock code snippet.', code: '<div>Mock</div>', language: 'html' }]
-        }), 2000));
+        return Promise.reject(new Error(`${provider} audits are not yet implemented.`));
     }
     
-    // In a real app, you would fetch the website's HTML source here.
-    // For this example, we'll use a placeholder HTML structure.
-    const websiteHtmlContent = `
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <title>My Test Website</title>
-            <meta name="description" content="A test website for auditing.">
-            <link rel="stylesheet" href="style.css">
-        </head>
-        <body>
-            <header>
-                <nav>
-                    <ul>
-                        <li><a>Home</a></li>
-                        <li><a href="/about">About</a></li>
-                    </ul>
-                </nav>
-            </header>
-            <main>
-                <p>Welcome to my website.</p>
-                <img src="photo.jpg">
-            </main>
-        </body>
-        </html>
-    `;
-
+    // Use a CORS proxy to fetch the website's HTML source
+    const proxyUrl = `https://cors-anywhere.herokuapp.com/${url}`;
+    let websiteHtmlContent = '';
     try {
-        // FIX: Initialize with API_KEY from environment variables as per guidelines.
-        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+        const response = await fetch(proxyUrl);
+        if (!response.ok) {
+            throw new Error(`Failed to fetch URL: ${response.statusText}`);
+        }
+        websiteHtmlContent = await response.text();
+    } catch (error) {
+        console.error("Error fetching website content:", error);
+        throw new Error("Could not retrieve the website's content. The URL may be invalid or the site may be blocking requests.");
+    }
+    
+    try {
+        const ai = new GoogleGenAI({ apiKey });
 
         const response: GenerateContentResponse = await ai.models.generateContent({
-            // FIX: Using gemini-2.5-pro for a complex reasoning task.
             model: "gemini-2.5-pro",
             contents: `Analyze the following HTML for ${url} and generate an audit report.\n\n\`\`\`html\n${websiteHtmlContent}\n\`\`\``,
             config: {
-                // FIX: Requesting JSON output with a specific schema.
                 responseMimeType: "application/json",
                 responseSchema: {
                     type: Type.OBJECT,
@@ -164,7 +134,6 @@ export const runAudit = async (url: string, provider: AiProvider): Promise<Audit
             },
         });
         
-        // FIX: Extract text directly from response object.
         const jsonText = response.text;
         const parsedData = JSON.parse(jsonText) as AuditReportData;
         
@@ -174,6 +143,9 @@ export const runAudit = async (url: string, provider: AiProvider): Promise<Audit
 
     } catch (error) {
         console.error("Error running audit with Gemini:", error);
+        if (error instanceof Error && error.message.includes('API key')) {
+             throw new Error("The provided Gemini API Key is invalid or has expired.");
+        }
         throw new Error("Failed to generate audit report from AI provider.");
     }
 };

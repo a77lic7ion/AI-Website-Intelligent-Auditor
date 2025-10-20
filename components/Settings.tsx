@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { User, Theme, AiProvider } from '../types';
 import { testApiKey } from '../geminiService';
@@ -27,14 +26,13 @@ const Settings: React.FC<SettingsProps> = ({ currentUser, theme, onThemeChange, 
 
     const handleSave = () => {
         onSaveApiKeys(localKeys);
-        // Optionally, show a success message
+        alert('API Keys saved!');
     };
 
     const handleTestKey = async (provider: AiProvider) => {
         setTestResults(prev => ({ ...prev, [provider]: 'testing' }));
         const keyToTest = localKeys[provider];
         
-        // FIX: The testApiKey service function handles the logic of using env vars for Gemini.
         const isValid = await testApiKey(provider, keyToTest);
         setTestResults(prev => ({ ...prev, [provider]: isValid ? 'success' : 'failed' }));
     };
@@ -73,28 +71,18 @@ const Settings: React.FC<SettingsProps> = ({ currentUser, theme, onThemeChange, 
                     {(Object.values(AiProvider) as AiProvider[]).map(provider => (
                         <div key={provider}>
                             <label className="block text-sm font-medium text-gray-500 dark:text-auditor-text-secondary mb-1">{provider} {provider === AiProvider.OLLAMA ? 'Server URL' : 'API Key'}</label>
-                            {/* FIX: Comply with guideline to not have UI for Gemini API key. */}
-                            {provider === AiProvider.GEMINI ? (
-                                <div className="flex items-center space-x-2 p-2 bg-gray-100 dark:bg-auditor-dark rounded-md border border-gray-300 dark:border-auditor-border">
-                                    <p className="text-sm text-gray-500 dark:text-auditor-text-secondary flex-grow">API Key is configured centrally via environment variable.</p>
-                                    <button onClick={() => handleTestKey(provider)} className="px-4 py-1.5 text-sm font-semibold text-gray-700 dark:text-auditor-text-secondary bg-white dark:bg-auditor-card hover:bg-gray-100 dark:hover:bg-auditor-border border border-gray-300 dark:border-auditor-border rounded-md transition-colors">
-                                        {testResults[provider] === 'testing' ? 'Testing...' : 'Test Connection'}
-                                    </button>
-                                </div>
-                            ) : (
-                                <div className="flex items-center space-x-2">
-                                    <input 
-                                        type="text" 
-                                        placeholder={provider === AiProvider.OLLAMA ? 'http://localhost:11434' : `Enter your ${provider} API Key`}
-                                        value={localKeys[provider]}
-                                        onChange={(e) => handleKeyChange(provider, e.target.value)}
-                                        className="flex-grow bg-gray-50 dark:bg-auditor-dark border border-gray-300 dark:border-auditor-border rounded-md px-3 py-2 text-gray-900 dark:text-auditor-text-primary focus:outline-none focus:ring-2 focus:ring-auditor-primary"
-                                    />
-                                    <button onClick={() => handleTestKey(provider)} className="px-4 py-2 text-sm font-semibold text-gray-700 dark:text-auditor-text-secondary bg-white dark:bg-auditor-card hover:bg-gray-100 dark:hover:bg-auditor-border border border-gray-300 dark:border-auditor-border rounded-md transition-colors">
-                                        {testResults[provider] === 'testing' ? 'Testing...' : 'Test'}
-                                    </button>
-                                </div>
-                            )}
+                            <div className="flex items-center space-x-2">
+                                <input 
+                                    type="text" 
+                                    placeholder={provider === AiProvider.OLLAMA ? 'http://localhost:11434' : `Enter your ${provider} API Key`}
+                                    value={localKeys[provider]}
+                                    onChange={(e) => handleKeyChange(provider, e.target.value)}
+                                    className="flex-grow bg-gray-50 dark:bg-auditor-dark border border-gray-300 dark:border-auditor-border rounded-md px-3 py-2 text-gray-900 dark:text-auditor-text-primary focus:outline-none focus:ring-2 focus:ring-auditor-primary"
+                                />
+                                <button onClick={() => handleTestKey(provider)} className="px-4 py-2 text-sm font-semibold text-gray-700 dark:text-auditor-text-secondary bg-white dark:bg-auditor-card hover:bg-gray-100 dark:hover:bg-auditor-border border border-gray-300 dark:border-auditor-border rounded-md transition-colors">
+                                    {testResults[provider] === 'testing' ? 'Testing...' : 'Test'}
+                                </button>
+                            </div>
                             {testResults[provider] === 'success' && <p className="text-xs text-auditor-secondary mt-1">Connection successful!</p>}
                             {testResults[provider] === 'failed' && <p className="text-xs text-severity-high mt-1">Connection failed. Please check your key/URL and network.</p>}
                         </div>

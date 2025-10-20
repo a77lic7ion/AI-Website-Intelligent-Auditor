@@ -1,21 +1,22 @@
-
 import React, { useState, useEffect } from 'react';
-import { AuditReport, Issue } from '../types';
+import { AuditReport, Issue, User } from '../types';
 import ScoreGauge from './ScoreGauge';
 import IssueRow from './IssueRow';
 import PrioritizedActionPlan from './PrioritizedActionPlan';
 import SuggestedSnippets from './SuggestedSnippets';
-import LivePreview from './LivePreview';
 import AutomaticCodeFixes from './AutomaticCodeFixes';
 import DetailedPdfReports from './DetailedPdfReports';
-import { GeminiIcon } from './icons';
+import { GeminiIcon, SaveIcon } from './icons';
 
 interface DashboardProps {
     latestReport: AuditReport | null;
     onNewAuditClick: () => void;
+    currentUser: User | null;
+    onSaveReport: (report: AuditReport) => void;
+    isLatestReportSaved: boolean;
 }
 
-const Dashboard: React.FC<DashboardProps> = ({ latestReport, onNewAuditClick }) => {
+const Dashboard: React.FC<DashboardProps> = ({ latestReport, onNewAuditClick, currentUser, onSaveReport, isLatestReportSaved }) => {
     const [issues, setIssues] = useState<Issue[]>([]);
 
     useEffect(() => {
@@ -47,26 +48,38 @@ const Dashboard: React.FC<DashboardProps> = ({ latestReport, onNewAuditClick }) 
         );
     }
 
-    const { url, reportData } = latestReport;
+    const { reportData } = latestReport;
+    const isProUser = currentUser?.email === 'shaunwg@outlook.com';
 
     return (
         <div className="space-y-8">
-            {/* Top Row: Score and Live Preview */}
+            {/* Top Row: Score and Action Plan */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                <div className="lg:col-span-1 bg-white dark:bg-auditor-card border border-gray-200 dark:border-auditor-border rounded-lg p-6 flex flex-col items-center justify-center">
+                <div className="lg:col-span-1 bg-white dark:bg-auditor-card border border-gray-200 dark:border-auditor-border rounded-lg p-6 flex flex-col items-center justify-center relative">
+                    <div className="absolute top-4 right-4">
+                        <button 
+                            onClick={() => onSaveReport(latestReport)} 
+                            disabled={isLatestReportSaved}
+                            className="flex items-center space-x-2 text-sm font-semibold text-gray-500 dark:text-auditor-text-secondary hover:text-auditor-primary dark:hover:text-auditor-primary disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                            aria-label="Save Report"
+                        >
+                            <SaveIcon className="h-5 w-5" />
+                            <span>{isLatestReportSaved ? 'Saved' : 'Save Report'}</span>
+                        </button>
+                    </div>
                     <h3 className="text-lg font-semibold text-gray-900 dark:text-auditor-text-primary mb-4">Overall Score</h3>
                     <ScoreGauge score={reportData.score} />
                     <p className="text-sm text-gray-500 dark:text-auditor-text-secondary mt-4 text-center">Based on an analysis of performance, accessibility, and SEO.</p>
                 </div>
                 <div className="lg:col-span-2">
-                    <LivePreview url={url} />
+                    <PrioritizedActionPlan plan={reportData.actionPlan} />
                 </div>
             </div>
 
             {/* Issues Table */}
              <div className="bg-white dark:bg-auditor-card border border-gray-200 dark:border-auditor-border rounded-lg shadow-sm">
                 <div className="p-4 border-b border-gray-200 dark:border-auditor-border">
-                    <h3 className="text-lg font-semibold text-gray-900 dark:text-auditor-text-primary">Detected Issues</h3>
+                    <h3 className="text-lg font-semibold text-gray-900 dark:text-auditor-text-primary">Audit Breakdown</h3>
                 </div>
                 <div className="overflow-x-auto">
                     <table className="w-full min-w-full divide-y divide-gray-200 dark:divide-auditor-border">
@@ -88,16 +101,11 @@ const Dashboard: React.FC<DashboardProps> = ({ latestReport, onNewAuditClick }) 
                 </div>
             </div>
             
-             {/* Middle Row: Action Plan and Snippets */}
+            {/* Pro Features: Snippets and more */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                <PrioritizedActionPlan plan={reportData.actionPlan} />
-                <SuggestedSnippets snippets={reportData.snippets} />
-            </div>
-
-            {/* Bottom Row: Pro Features */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                <AutomaticCodeFixes />
-                <DetailedPdfReports />
+                 <SuggestedSnippets snippets={reportData.snippets} />
+                 <AutomaticCodeFixes isUnlocked={isProUser} />
+                 <DetailedPdfReports isUnlocked={isProUser} />
             </div>
         </div>
     );
