@@ -1,47 +1,66 @@
-import React, { useState } from 'react';
-import { Issue, Severity } from '../types';
-import { ArrowDownIcon, ArrowUpIcon } from './icons';
+
+import React from 'react';
+import { Issue } from '../types';
+import { ArrowUpIcon, ArrowDownIcon, ErrorIcon } from './icons';
 
 interface IssueRowProps {
     issue: Issue;
+    onToggle: (id: string) => void;
 }
 
-const severityStyles: Record<Severity, { bg: string; text: string; }> = {
-    'Low': { bg: 'bg-blue-100 dark:bg-blue-900/30', text: 'text-blue-800 dark:text-blue-300' },
-    'Medium': { bg: 'bg-yellow-100 dark:bg-yellow-900/30', text: 'text-yellow-800 dark:text-yellow-300' },
-    'High': { bg: 'bg-orange-100 dark:bg-orange-900/30', text: 'text-orange-800 dark:text-orange-300' },
-    'Critical': { bg: 'bg-red-100 dark:bg-red-900/30', text: 'text-red-800 dark:text-red-300' },
+const severityConfig = {
+    High: {
+        bg: 'bg-red-100 dark:bg-red-900/30',
+        text: 'text-red-800 dark:text-red-300',
+        icon: 'text-severity-high'
+    },
+    Medium: {
+        bg: 'bg-yellow-100 dark:bg-yellow-900/30',
+        text: 'text-yellow-800 dark:text-yellow-300',
+        icon: 'text-severity-medium'
+    },
+    Low: {
+        bg: 'bg-gray-100 dark:bg-gray-700/30',
+        text: 'text-gray-800 dark:text-gray-300',
+        icon: 'text-severity-low'
+    },
 };
 
-
-const IssueRow: React.FC<IssueRowProps> = ({ issue }) => {
-    const [isExpanded, setIsExpanded] = useState(false);
-    const styles = severityStyles[issue.severity] || severityStyles['Low'];
+const IssueRow: React.FC<IssueRowProps> = ({ issue, onToggle }) => {
+    const config = severityConfig[issue.severity];
 
     return (
-        <div className="border border-gray-200 dark:border-auditor-border rounded-lg">
-            <button 
-                onClick={() => setIsExpanded(!isExpanded)}
-                className="w-full flex items-center justify-between p-4 text-left hover:bg-gray-50 dark:hover:bg-auditor-border/20 transition-colors"
-            >
-                <div className="flex items-center space-x-3 flex-1 min-w-0">
-                     <span className={`flex-shrink-0 px-2.5 py-0.5 text-xs font-semibold rounded-full ${styles.bg} ${styles.text}`}>{issue.severity}</span>
-                     <h4 className="font-semibold text-gray-900 dark:text-auditor-text-primary truncate">{issue.title}</h4>
-                </div>
-                <div className="flex items-center space-x-3 flex-shrink-0 pl-4">
-                     <span className="text-sm text-gray-500 dark:text-auditor-text-secondary hidden sm:block">{issue.category}</span>
-                     {isExpanded ? <ArrowUpIcon className="h-5 w-5 text-gray-500 dark:text-auditor-text-secondary" /> : <ArrowDownIcon className="h-5 w-5 text-gray-500 dark:text-auditor-text-secondary" />}
-                </div>
-            </button>
-            {isExpanded && (
-                <div className="p-4 border-t border-gray-200 dark:border-auditor-border bg-gray-50 dark:bg-auditor-dark">
-                    <h5 className="text-sm font-semibold text-gray-900 dark:text-auditor-text-primary mb-1">Description</h5>
-                    <p className="text-sm text-gray-600 dark:text-auditor-text-secondary mb-3">{issue.description}</p>
-                    <h5 className="text-sm font-semibold text-gray-900 dark:text-auditor-text-primary mb-1">Resolution</h5>
-                    <p className="text-sm text-gray-600 dark:text-auditor-text-secondary whitespace-pre-wrap font-mono bg-white dark:bg-auditor-dark-deep p-2 rounded-md">{issue.resolution}</p>
-                </div>
+        <>
+            <tr onClick={() => onToggle(issue.id)} className="cursor-pointer hover:bg-gray-50 dark:hover:bg-auditor-dark">
+                <td className="px-6 py-4 whitespace-nowrap">
+                    <div className="flex items-center">
+                        <ErrorIcon className={`h-5 w-5 mr-2 ${config.icon}`} />
+                        <span className="text-sm font-medium text-gray-900 dark:text-auditor-text-primary">{issue.title}</span>
+                    </div>
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap">
+                    <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${config.bg} ${config.text}`}>
+                        {issue.severity}
+                    </span>
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap text-right text-sm">
+                    <button className="text-gray-400 hover:text-gray-600 dark:text-auditor-text-secondary dark:hover:text-auditor-text-primary">
+                        {issue.isExpanded ? <ArrowUpIcon className="h-5 w-5" /> : <ArrowDownIcon className="h-5 w-5" />}
+                    </button>
+                </td>
+            </tr>
+            {issue.isExpanded && (
+                <tr>
+                    <td colSpan={3} className="px-6 py-4 bg-gray-50 dark:bg-auditor-dark">
+                        <div className="space-y-2">
+                             <p className="text-sm text-gray-700 dark:text-auditor-text-primary">{issue.description}</p>
+                             <h4 className="text-sm font-semibold text-gray-900 dark:text-auditor-text-primary pt-2">Recommendation</h4>
+                             <p className="text-sm text-gray-500 dark:text-auditor-text-secondary">{issue.recommendation}</p>
+                        </div>
+                    </td>
+                </tr>
             )}
-        </div>
+        </>
     );
 };
 

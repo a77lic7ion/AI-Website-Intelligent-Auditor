@@ -1,11 +1,12 @@
+
 export type Page = 'Dashboard' | 'Reports' | 'Integrations' | 'Settings';
 
-export interface User {
-  email: string;
-  fullName: string;
-}
-
 export type Theme = 'light' | 'dark' | 'system';
+
+export interface User {
+  fullName: string;
+  email: string;
+}
 
 export enum AiProvider {
   GEMINI = 'Gemini',
@@ -14,23 +15,29 @@ export enum AiProvider {
   OLLAMA = 'Ollama',
 }
 
-export type Severity = 'Low' | 'Medium' | 'High' | 'Critical';
-
-export type IssueCategory = 'Accessibility' | 'Performance' | 'SEO' | 'Best Practices' | 'Security';
-
-export interface Issue {
-  title: string;
-  description: string;
-  severity: Severity;
-  category: IssueCategory;
-  resolution: string;
+export interface AuditReport {
+  id: string;
+  url: string;
+  score: number;
+  timestamp: number;
+  provider: AiProvider;
+  reportData: AuditReportData;
 }
 
-export interface Snippet {
+export interface AuditReportData {
+    score: number;
+    issues: Issue[];
+    actionPlan: ActionItem[];
+    snippets: Snippet[];
+}
+
+export interface Issue {
+    id: string;
+    severity: 'Low' | 'Medium' | 'High';
     title: string;
     description: string;
-    code: string;
-    language: string;
+    recommendation: string;
+    isExpanded?: boolean;
 }
 
 export interface ActionItem {
@@ -38,13 +45,9 @@ export interface ActionItem {
     description: string;
 }
 
-export interface AuditReport {
-  id: string;
-  url: string;
-  timestamp: number;
-  score: number;
-  provider: AiProvider;
-  issues: Issue[];
-  actionPlan: ActionItem[];
-  snippets: Snippet[];
+export interface Snippet {
+    title: string;
+    description: string;
+    code: string;
+    language: string;
 }
