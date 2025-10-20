@@ -1,65 +1,74 @@
-// FIX: Removed self-import causing declaration conflicts. The file was importing types from itself.
-export enum IssueSeverity {
-  High = 'High',
-  Medium = 'Medium',
-  Low = 'Low',
+// types.ts
+
+export type Page = 'Dashboard' | 'Reports' | 'Integrations' | 'Settings';
+
+export type Theme = 'light' | 'dark' | 'system';
+
+export enum AiProvider {
+    GEMINI = 'Gemini',
+    OPENAI = 'OpenAI',
+    MISTRAL = 'Mistral',
+    OLLAMA = 'Ollama',
 }
 
-export enum IssueStatus {
-  Open = 'Open',
-  Fixed = 'Fixed',
-  Investigating = 'Investigating',
+export interface User {
+    email: string;
+    fullName: string;
+    isPro: boolean;
 }
 
 export enum PillarCategory {
-    Performance = 'Performance',
+    PERFORMANCE = 'Performance',
+    ACCESSIBILITY = 'Accessibility',
     SEO = 'SEO',
-    Accessibility = 'Accessibility',
-    Security = 'Security',
-    UIUX = 'UI/UX & Best Practices',
+    BEST_PRACTICES = 'Best Practices',
+    SECURITY = 'Security',
+}
+
+export enum IssueSeverity {
+    HIGH = 'High',
+    MEDIUM = 'Medium',
+    LOW = 'Low',
+}
+
+export enum IssueStatus {
+    OPEN = 'Open',
+    IN_PROGRESS = 'In Progress',
+    RESOLVED = 'Resolved',
 }
 
 export interface Issue {
-  id: string;
-  title: string;
-  category: PillarCategory;
-  severity: IssueSeverity;
-  status: IssueStatus;
-  description: string;
+    id: string;
+    title: string;
+    description: string;
+    severity: IssueSeverity;
+    category: PillarCategory;
+    status: IssueStatus;
+    contextualSnippet?: string;
+    screenshotPlaceholderUrl?: string;
 }
 
 export interface AuditReport {
-  score: number;
-  scannedPages: number;
-  totalPaes: 'Unlimited' | number;
-  issues: Issue[];
+    score: number;
+    scannedPages: number;
+    issues: Issue[];
 }
 
 export interface AiAnalysis {
-  summary: string;
-  prioritizedActionPlan: {
-      title: string;
-      description: string;
-  }[];
-  suggestedSnippets: {
-      title: string;
-      description: string;
-      code: string;
-      language: string;
-  }[];
+    summary: string;
+    prioritizedActionPlan: {
+        title: string;
+        description: string;
+    }[];
+    suggestedSnippets: {
+        title: string;
+        description: string;
+        code: string;
+        language: string;
+    }[];
 }
 
 export interface AiGeneratedAudit {
     auditReport: AuditReport;
     aiAnalysis: AiAnalysis;
 }
-
-
-export interface User {
-    fullName: string;
-    email: string;
-    isPro: boolean;
-}
-
-export type Page = 'Dashboard' | 'Reports' | 'Integrations' | 'Settings';
-export type Theme = 'light' | 'dark' | 'system';

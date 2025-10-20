@@ -2,136 +2,197 @@ import React, { useState, useEffect } from 'react';
 import Sidebar from './components/Sidebar';
 import Header from './components/Header';
 import Dashboard from './components/Dashboard';
-import Settings from './components/Settings';
-import Integrations from './components/Integrations';
 import Reports from './components/Reports';
+import Integrations from './components/Integrations';
+import Settings from './components/Settings';
+import NewAuditModal from './components/NewAuditModal';
 import Login from './components/Login';
 import SignUp from './components/SignUp';
-import NewAuditModal from './components/NewAuditModal';
-import { Page, Theme, User, AiGeneratedAudit } from './types';
-import { generateAudit } from './geminiService';
+import { Page, User, AiGeneratedAudit, Theme, AiProvider } from './types';
+import { runAudit } from './geminiService';
 
 const App: React.FC = () => {
-  const [currentUser, setCurrentUser] = useState<User | null>(null);
-  const [authPage, setAuthPage] = useState<'login' | 'signup'>('login');
-  const [activePage, setActivePage] = useState<Page>('Dashboard');
-  const [theme, setTheme] = useState<Theme>(() => (localStorage.getItem('theme') as Theme) || 'system');
-  
-  const [isNewAuditModalOpen, setIsNewAuditModalOpen] = useState(false);
-  const [auditedUrl, setAuditedUrl] = useState('');
-  
-  const [auditResult, setAuditResult] = useState<AiGeneratedAudit | null>(null);
-  const [isAuditing, setIsAuditing] = useState(false);
-  const [auditError, setAuditError] = useState<string | null>(null);
+    // Authentication State
+    const [isAuthenticated, setIsAuthenticated] = useState(false);
+    const [authScreen, setAuthScreen] = useState<'login' | 'signup'>('login');
+    const [currentUser, setCurrentUser] = useState<User | null>(null);
 
+    // API Key State
+    const [apiKeys, setApiKeys] = useState<Record<AiProvider, string>>({
+        [AiProvider.GEMINI]: '',
+        [AiProvider.OPENAI]: '',
+        [AiProvider.MISTRAL]: '',
+        [AiProvider.OLLAMA]: '',
+    });
 
-  useEffect(() => {
-    const root = window.document.documentElement;
-    const isDark = theme === 'dark' || (theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
-    root.classList.toggle('dark', isDark);
-    localStorage.setItem('theme', theme);
-    
-    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
-    const handleChange = () => {
-      if (theme === 'system') {
-        root.classList.toggle('dark', mediaQuery.matches);
-      }
+    // Navigation and UI State
+    const [activePage, setActivePage] = useState<Page>('Dashboard');
+    const [theme, setTheme] = useState<Theme>('system');
+    const [isNewAuditModalOpen, setIsNewAuditModalOpen] = useState(false);
+
+    // Audit State
+    const [auditResult, setAuditResult] = useState<AiGeneratedAudit | null>(null);
+    const [auditedUrl, setAuditedUrl] = useState<string>('');
+    const [isAuditing, setIsAuditing] = useState(false);
+    const [auditError, setAuditError] = useState<string | null>(null);
+
+    // Load saved data on initial render
+    useEffect(() => {
+        // User session
+        const savedUser = localStorage.getItem('siteAuditorUser');
+        if (savedUser) {
+            const user = JSON.parse(savedUser);
+            setCurrentUser(user);
+            setIsAuthenticated(true);
+        }
+        // API Keys
+        const savedKeys = localStorage.getItem('siteAuditorApiKeys');
+        if (savedKeys) {
+            setApiKeys(JSON.parse(savedKeys));
+        }
+        // Theme
+        const savedTheme = localStorage.getItem('siteAuditorTheme') as Theme | null;
+        if (savedTheme) {
+            setTheme(savedTheme);
+        }
+    }, []);
+
+    // Apply theme changes
+    useEffect(() => {
+        if (theme === 'dark' || (theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+            document.documentElement.classList.add('dark');
+        } else {
+            document.documentElement.classList.remove('dark');
+        }
+        localStorage.setItem('siteAuditorTheme', theme);
+    }, [theme]);
+
+    const handleLogin = (user: {email: string; fullName: string;}) => {
+        const proUser: User = { ...user, isPro: user.email === 'shaunwg@outlook.com' };
+        setCurrentUser(proUser);
+        setIsAuthenticated(true);
+        localStorage.setItem('siteAuditorUser', JSON.stringify(proUser));
     };
 
-    mediaQuery.addEventListener('change', handleChange);
-    return () => mediaQuery.removeEventListener('change', handleChange);
-  }, [theme]);
+    const handleLogout = () => {
+        setCurrentUser(null);
+        setIsAuthenticated(false);
+        setAuditResult(null);
+        setAuditedUrl('');
+        setActivePage('Dashboard');
+        localStorage.removeItem('siteAuditorUser');
+    };
 
-  const handleLoginSuccess = (user: { email: string; fullName: string; }) => {
-    const isPro = user.email.toLowerCase() === 'shaunwg@outlook.com';
-    setCurrentUser({ ...user, isPro });
-  };
+    const handleSaveApiKeys = (keys: Record<AiProvider, string>) => {
+        setApiKeys(keys);
+        localStorage.setItem('siteAuditorApiKeys', JSON.stringify(keys));
+    };
 
-  const handleLogout = () => {
-    setCurrentUser(null);
-    setAuthPage('login'); 
-    setAuditResult(null);
-    setAuditedUrl('');
-  };
+    const handleStartAudit = async (url: string, provider: AiProvider) => {
+        setIsNewAuditModalOpen(false);
+        setActivePage('Dashboard');
+        setIsAuditing(true);
+        setAuditError(null);
+        setAuditedUrl(url);
+        setAuditResult(null);
 
-  const handleStartAudit = async (url: string) => {
-    setAuditedUrl(url);
-    setIsNewAuditModalOpen(false);
-    setActivePage('Dashboard');
-    setIsAuditing(true);
-    setAuditError(null);
-    setAuditResult(null);
+        const apiKey = apiKeys[provider];
+        if (!apiKey && provider !== AiProvider.OLLAMA) {
+             setAuditError(`API Key for ${provider} is not set. Please add it in Settings.`);
+             setIsAuditing(false);
+             return;
+        }
+        if (!apiKeys[AiProvider.OLLAMA] && provider === AiProvider.OLLAMA) {
+            setAuditError(`Ollama Server URL is not set. Please add it in Settings.`);
+            setIsAuditing(false);
+            return;
+        }
 
-    try {
-      const result = await generateAudit(url);
-      setAuditResult(result);
-    } catch (error) {
-      console.error("Audit generation failed:", error);
-      setAuditError("Failed to generate the audit. The Gemini API might be unavailable or the URL may be inaccessible. Please check the console for more details.");
-    } finally {
-      setIsAuditing(false);
-    }
-  };
-  
-  if (!currentUser) {
-    if (authPage === 'login') {
-      return <Login onLoginSuccess={handleLoginSuccess} onSwitchToSignUp={() => setAuthPage('signup')} />;
-    } else {
-      return <SignUp onLoginSuccess={handleLoginSuccess} onSwitchToLogin={() => setAuthPage('login')} />;
-    }
-  }
+        try {
+            // In a real app, use a backend proxy to fetch URL content to avoid CORS issues.
+            // As a fallback for this client-side demo, we'll try a direct fetch.
+            const response = await fetch(url);
+            if (!response.ok) {
+                throw new Error(`Failed to fetch URL: ${response.status} ${response.statusText}`);
+            }
+            const htmlContent = await response.text();
+            
+            const result = await runAudit(provider, apiKey, url, htmlContent);
+            setAuditResult(result);
+        } catch (error) {
+            const message = error instanceof Error ? error.message : 'An unknown error occurred.';
+            // Add a more helpful message for the likely CORS issue
+            if (message.includes('Failed to fetch')) {
+                 setAuditError("Failed to fetch the URL due to browser security (CORS policy). For a real application, this should be handled by a backend proxy. For local testing, you can use a browser extension to disable CORS.");
+            } else {
+                setAuditError(message);
+            }
+        } finally {
+            setIsAuditing(false);
+        }
+    };
 
-  const pageDetails = {
-    Dashboard: { title: 'Website Audit Results', subtitle: auditedUrl ? `Results for ${auditedUrl}` : 'Start an audit to see results' },
-    Reports: { title: 'Reports', subtitle: 'View and export your audit reports' },
-    Integrations: { title: 'Integrations', subtitle: 'Connect with other services' },
-    Settings: { title: 'Settings', subtitle: 'Manage your account and preferences' },
-  };
-
-  const renderContent = () => {
-    switch (activePage) {
-      case 'Dashboard':
-        return <Dashboard 
-                  currentUser={currentUser} 
-                  auditedUrl={auditedUrl} 
-                  auditResult={auditResult}
-                  isAuditing={isAuditing}
-                  auditError={auditError}
-                  onNewAuditClick={() => setIsNewAuditModalOpen(true)}
+    const renderPage = () => {
+        if (!currentUser) return null;
+        switch (activePage) {
+            case 'Dashboard':
+                return <Dashboard 
+                    currentUser={currentUser} 
+                    auditedUrl={auditedUrl} 
+                    auditResult={auditResult}
+                    isAuditing={isAuditing}
+                    auditError={auditError}
+                    onNewAuditClick={() => setIsNewAuditModalOpen(true)}
                 />;
-      case 'Reports':
-        return <Reports auditResult={auditResult} />;
-      case 'Settings':
-        return <Settings theme={theme} setTheme={setTheme} />;
-      case 'Integrations':
-        return <Integrations />;
-      default:
-        return <div className="flex items-center justify-center h-full"><p className="text-auditor-text-secondary text-lg">Coming Soon!</p></div>;
-    }
-  };
+            case 'Reports':
+                return <Reports auditResult={auditResult} />;
+            case 'Integrations':
+                return <Integrations />;
+            case 'Settings':
+                return <Settings 
+                    currentUser={currentUser} 
+                    theme={theme}
+                    onThemeChange={setTheme}
+                    apiKeys={apiKeys}
+                    onSaveApiKeys={handleSaveApiKeys}
+                />;
+            default:
+                return null;
+        }
+    };
 
-  return (
-    <>
-      <div className="flex h-screen bg-gray-50 dark:bg-auditor-dark text-gray-900 dark:text-auditor-text-primary font-sans">
-        <Sidebar activePage={activePage} onNavigate={setActivePage} onLogout={handleLogout} currentUser={currentUser} />
-        <div className="flex flex-col flex-1">
-          <Header 
-            title={pageDetails[activePage].title} 
-            subtitle={pageDetails[activePage].subtitle} 
-            onNewAuditClick={() => setIsNewAuditModalOpen(true)} 
-          />
-          <main className="flex-1 p-6 lg:p-8 overflow-y-auto">
-            {renderContent()}
-          </main>
+    if (!isAuthenticated || !currentUser) {
+        if (authScreen === 'login') {
+            return <Login onLoginSuccess={handleLogin} onSwitchToSignUp={() => setAuthScreen('signup')} />;
+        }
+        return <SignUp onLoginSuccess={handleLogin} onSwitchToLogin={() => setAuthScreen('login')} />;
+    }
+
+    return (
+        <div className="flex h-screen bg-gray-50 dark:bg-auditor-dark">
+            <Sidebar 
+                activePage={activePage} 
+                onNavigate={setActivePage} 
+                onLogout={handleLogout}
+                currentUser={currentUser}
+            />
+            <div className="flex-1 flex flex-col overflow-hidden">
+                <Header 
+                    title={activePage} 
+                    subtitle={activePage === 'Dashboard' && auditedUrl ? `Audit results for ${auditedUrl}` : `Manage your ${activePage.toLowerCase()}`}
+                    onNewAuditClick={() => setIsNewAuditModalOpen(true)}
+                />
+                <main className="flex-1 overflow-y-auto p-6 lg:p-8">
+                    {renderPage()}
+                </main>
+            </div>
+            <NewAuditModal 
+                isOpen={isNewAuditModalOpen}
+                onClose={() => setIsNewAuditModalOpen(false)}
+                onStartAudit={handleStartAudit}
+            />
         </div>
-      </div>
-      <NewAuditModal 
-        isOpen={isNewAuditModalOpen}
-        onClose={() => setIsNewAuditModalOpen(false)}
-        onStartAudit={handleStartAudit}
-      />
-    </>
-  );
+    );
 };
 
 export default App;
