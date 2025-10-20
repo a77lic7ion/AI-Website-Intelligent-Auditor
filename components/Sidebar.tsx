@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { DashboardIcon, ReportsIcon, IntegrationsIcon, SettingsIcon, LogoutIcon } from './icons';
 import { Page } from '../types';
@@ -6,9 +5,10 @@ import { Page } from '../types';
 interface SidebarProps {
     activePage: Page;
     onNavigate: (page: Page) => void;
+    onLogout: () => void;
 }
 
-const Sidebar: React.FC<SidebarProps> = ({ activePage, onNavigate }) => {
+const Sidebar: React.FC<SidebarProps> = ({ activePage, onNavigate, onLogout }) => {
     return (
         <div className="w-64 bg-white dark:bg-auditor-dark border-r border-gray-200 dark:border-auditor-border flex flex-col p-4">
             <div className="flex items-center space-x-3 mb-10 px-2">
@@ -32,7 +32,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activePage, onNavigate }) => {
                         <p className="font-semibold text-gray-900 dark:text-auditor-text-primary">Alex Johnson</p>
                         <p className="text-sm text-gray-500 dark:text-auditor-text-secondary">alex.j@example.com</p>
                     </div>
-                    <button className="ml-auto text-gray-500 dark:text-auditor-text-secondary hover:text-gray-900 dark:hover:text-auditor-text-primary">
+                    <button onClick={onLogout} className="ml-auto text-gray-500 dark:text-auditor-text-secondary hover:text-gray-900 dark:hover:text-auditor-text-primary" aria-label="Logout">
                         <LogoutIcon className="h-5 w-5" />
                     </button>
                 </div>

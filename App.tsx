@@ -5,9 +5,11 @@ import Dashboard from './components/Dashboard';
 import Settings from './components/Settings';
 import Integrations from './components/Integrations';
 import Reports from './components/Reports';
+import Login from './components/Login';
 import { Page, Theme } from './types';
 
 const App: React.FC = () => {
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [activePage, setActivePage] = useState<Page>('Dashboard');
   const [theme, setTheme] = useState<Theme>(() => (localStorage.getItem('theme') as Theme) || 'system');
 
@@ -28,6 +30,17 @@ const App: React.FC = () => {
     return () => mediaQuery.removeEventListener('change', handleChange);
   }, [theme]);
 
+  const handleLoginSuccess = () => {
+    setIsAuthenticated(true);
+  };
+
+  const handleLogout = () => {
+    setIsAuthenticated(false);
+  };
+  
+  if (!isAuthenticated) {
+    return <Login onLoginSuccess={handleLoginSuccess} />;
+  }
 
   const pageDetails = {
     Dashboard: { title: 'Website Audit Results', subtitle: 'Last updated: 2024-01-15' },
@@ -53,7 +66,7 @@ const App: React.FC = () => {
 
   return (
     <div className="flex h-screen bg-gray-50 dark:bg-auditor-dark text-gray-900 dark:text-auditor-text-primary font-sans">
-      <Sidebar activePage={activePage} onNavigate={setActivePage} />
+      <Sidebar activePage={activePage} onNavigate={setActivePage} onLogout={handleLogout} />
       <div className="flex flex-col flex-1">
         <Header title={pageDetails[activePage].title} subtitle={pageDetails[activePage].subtitle} />
         <main className="flex-1 p-6 lg:p-8 overflow-y-auto">
