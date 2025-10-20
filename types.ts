@@ -1,86 +1,50 @@
-// types.ts
-
 export type Page = 'Dashboard' | 'Reports' | 'Integrations' | 'Settings';
+
+export interface User {
+  email: string;
+  fullName: string;
+}
 
 export type Theme = 'light' | 'dark' | 'system';
 
 export enum AiProvider {
-    GEMINI = 'Gemini',
-    OPENAI = 'OpenAI',
-    MISTRAL = 'Mistral',
-    OLLAMA = 'Ollama',
+  GEMINI = 'Gemini',
+  OPENAI = 'OpenAI',
+  MISTRAL = 'Mistral',
+  OLLAMA = 'Ollama',
 }
 
-export interface User {
-    email: string;
-    fullName: string;
-    isPro: boolean;
-}
+export type Severity = 'Low' | 'Medium' | 'High' | 'Critical';
 
-export enum PillarCategory {
-    PERFORMANCE = 'Performance',
-    ACCESSIBILITY = 'Accessibility',
-    SEO = 'SEO',
-    BEST_PRACTICES = 'Best Practices',
-    SECURITY = 'Security',
-}
-
-export enum IssueSeverity {
-    HIGH = 'High',
-    MEDIUM = 'Medium',
-    LOW = 'Low',
-}
-
-export enum IssueStatus {
-    OPEN = 'Open',
-    IN_PROGRESS = 'In Progress',
-    RESOLVED = 'Resolved',
-}
+export type IssueCategory = 'Accessibility' | 'Performance' | 'SEO' | 'Best Practices' | 'Security';
 
 export interface Issue {
-    id: string;
+  title: string;
+  description: string;
+  severity: Severity;
+  category: IssueCategory;
+  resolution: string;
+}
+
+export interface Snippet {
     title: string;
     description: string;
-    severity: IssueSeverity;
-    category: PillarCategory;
-    status: IssueStatus;
-    contextualSnippet?: string;
-    screenshotPlaceholderUrl?: string;
+    code: string;
+    language: string;
+}
+
+export interface ActionItem {
+    title: string;
+    description: string;
 }
 
 export interface AuditReport {
-    score: number;
-    scannedPages: number;
-    issues: Issue[];
-}
-
-export interface AiAnalysis {
-    summary: string;
-    prioritizedActionPlan: {
-        title: string;
-        description: string;
-    }[];
-    suggestedSnippets: {
-        title: string;
-        description: string;
-        code: string;
-        language: string;
-    }[];
-}
-
-export interface AiGeneratedAudit {
-    auditReport: AuditReport;
-    aiAnalysis: AiAnalysis;
-}
-
-export interface SavedAuditReport {
-    id: string; // A unique ID, e.g., from Date.now()
-    url: string;
-    savedAt: string; // ISO string date
-    auditResult: AiGeneratedAudit;
-}
-
-export interface AuditError {
-    type: 'api_key' | 'network' | 'url_fetch' | 'safety' | 'parsing' | 'unknown';
-    message: string;
+  id: string;
+  url: string;
+  timestamp: number;
+  score: number;
+  provider: AiProvider;
+  issues: Issue[];
+  actionPlan: ActionItem[];
+  snippets: Snippet[];
 }

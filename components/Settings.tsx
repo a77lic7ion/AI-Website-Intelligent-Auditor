@@ -71,7 +71,8 @@ const Settings: React.FC<SettingsProps> = ({ currentUser, theme, onThemeChange, 
                      <p className="text-sm text-gray-500 dark:text-auditor-text-secondary mt-1">Manage API keys for the AI models used in audits.</p>
                 </div>
                 <div className="p-6 space-y-6">
-                    {(Object.values(AiProvider)).map(provider => (
+                    {/* Fix: Cast Object.values to AiProvider[] to resolve typing issues */}
+                    {(Object.values(AiProvider) as AiProvider[]).map(provider => (
                         <div key={provider}>
                             <label className="block text-sm font-medium text-gray-500 dark:text-auditor-text-secondary mb-1">{provider} {provider === AiProvider.OLLAMA ? 'Server URL' : 'API Key'}</label>
                             <div className="flex items-center space-x-2">

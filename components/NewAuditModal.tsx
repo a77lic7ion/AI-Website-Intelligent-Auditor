@@ -75,7 +75,8 @@ const NewAuditModal: React.FC<NewAuditModalProps> = ({ isOpen, onClose, onStartA
                                 onChange={(e) => setProvider(e.target.value as AiProvider)}
                                 className="w-full bg-gray-50 dark:bg-auditor-dark border border-gray-300 dark:border-auditor-border rounded-md px-3 py-2 text-gray-900 dark:text-auditor-text-primary focus:outline-none focus:ring-2 focus:ring-auditor-primary"
                             >
-                                {Object.values(AiProvider).map(p => <option key={p} value={p}>{p}</option>)}
+                                {/* Fix: Cast Object.values to AiProvider[] to resolve typing issues */}
+                                {(Object.values(AiProvider) as AiProvider[]).map(p => <option key={p} value={p}>{p}</option>)}
                             </select>
                         </div>
                     </div>

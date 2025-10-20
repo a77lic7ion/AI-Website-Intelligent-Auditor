@@ -5,252 +5,118 @@ import Dashboard from './components/Dashboard';
 import Reports from './components/Reports';
 import Integrations from './components/Integrations';
 import Settings from './components/Settings';
-import NewAuditModal from './components/NewAuditModal';
 import Login from './components/Login';
 import SignUp from './components/SignUp';
-import { Page, User, AiGeneratedAudit, Theme, AiProvider, SavedAuditReport, AuditError } from './types';
-import { runAudit } from './geminiService';
+import NewAuditModal from './components/NewAuditModal';
+import { Page, User, Theme, AiProvider, AuditReport } from './types';
+import { generateAuditReport } from './geminiService';
 
 const App: React.FC = () => {
-    // Authentication State
-    const [isAuthenticated, setIsAuthenticated] = useState(false);
-    const [authScreen, setAuthScreen] = useState<'login' | 'signup'>('login');
-    const [currentUser, setCurrentUser] = useState<User | null>(null);
-
-    // API Key State
+    // State management
+    const [auth, setAuth] = useState<{ user: User | null; screen: 'login' | 'signup' | 'app' }>({ user: null, screen: 'login' });
+    const [activePage, setActivePage] = useState<Page>('Dashboard');
+    const [theme, setTheme] = useState<Theme>('system');
+    const [isModalOpen, setIsModalOpen] = useState(false);
+    const [reports, setReports] = useState<AuditReport[]>([]);
+    const [currentAudit, setCurrentAudit] = useState<AuditReport | null>(null);
+    const [isLoading, setIsLoading] = useState(false);
+    const [error, setError] = useState<string | null>(null);
     const [apiKeys, setApiKeys] = useState<Record<AiProvider, string>>({
-        [AiProvider.GEMINI]: '',
+        [AiProvider.GEMINI]: process.env.API_KEY || '',
         [AiProvider.OPENAI]: '',
         [AiProvider.MISTRAL]: '',
         [AiProvider.OLLAMA]: '',
     });
 
-    // Navigation and UI State
-    const [activePage, setActivePage] = useState<Page>('Dashboard');
-    const [theme, setTheme] = useState<Theme>('system');
-    const [isNewAuditModalOpen, setIsNewAuditModalOpen] = useState(false);
-
-    // Audit State
-    const [auditResult, setAuditResult] = useState<AiGeneratedAudit | null>(null);
-    const [auditedUrl, setAuditedUrl] = useState<string>('');
-    const [isAuditing, setIsAuditing] = useState(false);
-    const [auditError, setAuditError] = useState<AuditError | null>(null);
-    
-    // Save & Compare State
-    const [savedReports, setSavedReports] = useState<SavedAuditReport[]>([]);
-    const [loadedReport, setLoadedReport] = useState<SavedAuditReport | null>(null);
-
-    // Load saved data on initial render
+    // Theme effect
     useEffect(() => {
-        // User session
-        const savedUser = localStorage.getItem('siteAuditorUser');
-        if (savedUser) {
-            const user = JSON.parse(savedUser);
-            setCurrentUser(user);
-            setIsAuthenticated(true);
-        }
-        // API Keys
-        const savedKeys = localStorage.getItem('siteAuditorApiKeys');
-        if (savedKeys) {
-            setApiKeys(JSON.parse(savedKeys));
-        }
-        // Theme
-        const savedTheme = localStorage.getItem('siteAuditorTheme') as Theme | null;
-        if (savedTheme) {
-            setTheme(savedTheme);
-        }
-        // Saved Reports
-        const reports = localStorage.getItem('siteAuditorSavedReports');
-        if (reports) {
-            setSavedReports(JSON.parse(reports));
-        }
-    }, []);
-
-    // Apply theme changes
-    useEffect(() => {
-        if (theme === 'dark' || (theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
-            document.documentElement.classList.add('dark');
-        } else {
-            document.documentElement.classList.remove('dark');
-        }
-        localStorage.setItem('siteAuditorTheme', theme);
+        const applyTheme = () => {
+            if (theme === 'system') {
+                const systemPrefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+                document.documentElement.classList.toggle('dark', systemPrefersDark);
+            } else {
+                document.documentElement.classList.toggle('dark', theme === 'dark');
+            }
+        };
+        applyTheme();
+        const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+        mediaQuery.addEventListener('change', applyTheme);
+        return () => mediaQuery.removeEventListener('change', applyTheme);
     }, [theme]);
 
-    const handleLogin = (user: {email: string; fullName: string;}) => {
-        const proUser: User = { ...user, isPro: user.email === 'shaunwg@outlook.com' };
-        setCurrentUser(proUser);
-        setIsAuthenticated(true);
-        localStorage.setItem('siteAuditorUser', JSON.stringify(proUser));
+    // Handlers
+    const handleLoginSuccess = (user: User) => {
+        setAuth({ user, screen: 'app' });
     };
 
     const handleLogout = () => {
-        setCurrentUser(null);
-        setIsAuthenticated(false);
-        setAuditResult(null);
-        setAuditedUrl('');
-        setLoadedReport(null);
+        setAuth({ user: null, screen: 'login' });
         setActivePage('Dashboard');
-        localStorage.removeItem('siteAuditorUser');
-    };
-
-    const handleSaveApiKeys = (keys: Record<AiProvider, string>) => {
-        setApiKeys(keys);
-        localStorage.setItem('siteAuditorApiKeys', JSON.stringify(keys));
-    };
-    
-    const handleSaveCurrentReport = () => {
-        if (!auditResult || !auditedUrl) return;
-        const newSavedReport: SavedAuditReport = {
-            id: Date.now().toString(),
-            url: auditedUrl,
-            savedAt: new Date().toISOString(),
-            auditResult: auditResult,
-        };
-        const updatedReports = [...savedReports, newSavedReport];
-        setSavedReports(updatedReports);
-        localStorage.setItem('siteAuditorSavedReports', JSON.stringify(updatedReports));
-    };
-
-    const handleLoadReport = (reportId: string) => {
-        const reportToLoad = savedReports.find(r => r.id === reportId);
-        if (reportToLoad) {
-            setLoadedReport(reportToLoad);
-            setAuditResult(reportToLoad.auditResult);
-            setAuditedUrl(reportToLoad.url);
-            setAuditError(null);
-            setActivePage('Dashboard');
-        }
-    };
-
-    const handleDeleteReport = (reportId: string) => {
-        const updatedReports = savedReports.filter(r => r.id !== reportId);
-        setSavedReports(updatedReports);
-        localStorage.setItem('siteAuditorSavedReports', JSON.stringify(updatedReports));
-        if (loadedReport?.id === reportId) {
-            setLoadedReport(null);
-        }
     };
 
     const handleStartAudit = async (url: string, provider: AiProvider) => {
-        setIsNewAuditModalOpen(false);
+        setIsModalOpen(false);
+        setIsLoading(true);
+        setError(null);
+        setCurrentAudit(null);
         setActivePage('Dashboard');
-        setIsAuditing(true);
-        setAuditError(null);
-        setAuditedUrl(url);
-        // If the new URL is different from the loaded report, clear the comparison
-        if (loadedReport && loadedReport.url !== url) {
-            setLoadedReport(null);
-        }
-        setAuditResult(null);
-
-        const apiKey = apiKeys[provider];
-        if (!apiKey && provider !== AiProvider.OLLAMA) {
-             setAuditError({ type: 'api_key', message: `API Key for ${provider} is not set. Please add it in Settings.`});
-             setIsAuditing(false);
-             return;
-        }
-        if (!apiKeys[AiProvider.OLLAMA] && provider === AiProvider.OLLAMA) {
-            setAuditError({ type: 'api_key', message: `Ollama Server URL is not set. Please add it in Settings.`});
-            setIsAuditing(false);
-            return;
-        }
 
         try {
-            const proxyUrl = 'https://api.allorigins.win/raw?url=';
-            const response = await fetch(`${proxyUrl}${encodeURIComponent(url)}`);
-
-            if (!response.ok) {
-                throw { type: 'url_fetch', message: `Failed to fetch URL content (${response.status} ${response.statusText}). The website may be down or blocking requests.` };
+            const apiKey = apiKeys[provider];
+            if (provider === AiProvider.GEMINI && !apiKey) {
+                throw new Error('Gemini API key is not set. Please add it in Settings.');
             }
-            const htmlContent = await response.text();
             
-            const result = await runAudit(provider, apiKey, url, htmlContent);
-            setAuditResult(result);
-        } catch (error: any) {
-            if (error.type) { // If it's our custom error object
-                setAuditError(error as AuditError);
-            } else {
-                 const message = error instanceof Error ? error.message : 'An unknown error occurred.';
-                 if (message.includes('API key not valid')) {
-                     setAuditError({ type: 'api_key', message: `The ${provider} API Key is invalid or expired. Please check it in Settings.`});
-                 } else if (message.includes('NetworkError') || message.includes('Failed to fetch')) {
-                     setAuditError({ type: 'network', message: `A network error occurred. Please check your connection and try again.`});
-                 } else {
-                     setAuditError({ type: 'unknown', message });
-                 }
-            }
+            const newReport = await generateAuditReport(url, provider, apiKey);
+            setReports(prev => [newReport, ...prev]);
+            setCurrentAudit(newReport);
+        } catch (err: any) {
+            setError(err.message || 'An unknown error occurred during the audit.');
         } finally {
-            setIsAuditing(false);
+            setIsLoading(false);
         }
     };
-
+    
     const renderPage = () => {
-        if (!currentUser) return null;
-        const comparisonResult = (loadedReport && loadedReport.url === auditedUrl && loadedReport.auditResult !== auditResult) ? loadedReport.auditResult : null;
-
         switch (activePage) {
             case 'Dashboard':
-                return <Dashboard 
-                    currentUser={currentUser} 
-                    auditedUrl={auditedUrl} 
-                    auditResult={auditResult}
-                    isAuditing={isAuditing}
-                    auditError={auditError}
-                    onNewAuditClick={() => setIsNewAuditModalOpen(true)}
-                    onSaveReport={handleSaveCurrentReport}
-                    comparisonResult={comparisonResult}
-                />;
+                return <Dashboard latestReport={currentAudit} isLoading={isLoading} error={error} onNewAuditClick={() => setIsModalOpen(true)} />;
             case 'Reports':
-                return <Reports 
-                    auditResult={auditResult}
-                    comparisonResult={comparisonResult}
-                    savedReports={savedReports}
-                    onLoadReport={handleLoadReport}
-                    onDeleteReport={handleDeleteReport}
-                 />;
+                return <Reports reports={reports} />;
             case 'Integrations':
                 return <Integrations />;
             case 'Settings':
-                return <Settings 
-                    currentUser={currentUser} 
-                    theme={theme}
-                    onThemeChange={setTheme}
-                    apiKeys={apiKeys}
-                    onSaveApiKeys={handleSaveApiKeys}
-                />;
+                return <Settings currentUser={auth.user!} theme={theme} onThemeChange={setTheme} apiKeys={apiKeys} onSaveApiKeys={setApiKeys} />;
             default:
-                return null;
+                return <Dashboard latestReport={currentAudit} isLoading={isLoading} error={error} onNewAuditClick={() => setIsModalOpen(true)} />;
         }
     };
 
-    if (!isAuthenticated || !currentUser) {
-        if (authScreen === 'login') {
-            return <Login onLoginSuccess={handleLogin} onSwitchToSignUp={() => setAuthScreen('signup')} />;
-        }
-        return <SignUp onLoginSuccess={handleLogin} onSwitchToLogin={() => setAuthScreen('login')} />;
+    // Render logic
+    if (auth.screen === 'login') {
+        return <Login onLoginSuccess={handleLoginSuccess} onSwitchToSignUp={() => setAuth(prev => ({ ...prev, screen: 'signup' }))} />;
+    }
+
+    if (auth.screen === 'signup') {
+        return <SignUp onLoginSuccess={handleLoginSuccess} onSwitchToLogin={() => setAuth(prev => ({ ...prev, screen: 'login' }))} />;
     }
 
     return (
-        <div className="flex h-screen bg-gray-50 dark:bg-auditor-dark">
-            <Sidebar 
-                activePage={activePage} 
-                onNavigate={setActivePage} 
-                onLogout={handleLogout}
-                currentUser={currentUser}
-            />
+        <div className="flex h-screen bg-gray-50 dark:bg-auditor-dark-deep font-sans">
+            <Sidebar activePage={activePage} onNavigate={setActivePage} onLogout={handleLogout} currentUser={auth.user} />
             <div className="flex-1 flex flex-col overflow-hidden">
                 <Header 
                     title={activePage} 
-                    subtitle={activePage === 'Dashboard' && auditedUrl ? `Audit results for ${auditedUrl}` : `Manage your ${activePage.toLowerCase()}`}
-                    onNewAuditClick={() => setIsNewAuditModalOpen(true)}
+                    subtitle="Welcome back, let's get auditing!" 
+                    onNewAuditClick={() => setIsModalOpen(true)} 
                 />
                 <main className="flex-1 overflow-y-auto p-6 lg:p-8">
                     {renderPage()}
                 </main>
             </div>
             <NewAuditModal 
-                isOpen={isNewAuditModalOpen}
-                onClose={() => setIsNewAuditModalOpen(false)}
+                isOpen={isModalOpen}
+                onClose={() => setIsModalOpen(false)}
                 onStartAudit={handleStartAudit}
             />
         </div>
