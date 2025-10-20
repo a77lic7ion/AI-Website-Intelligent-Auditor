@@ -109,11 +109,12 @@ const App: React.FC = () => {
         }
 
         try {
-            // In a real app, use a backend proxy to fetch URL content to avoid CORS issues.
-            // As a fallback for this client-side demo, we'll try a direct fetch.
-            const response = await fetch(url);
+            // Use a CORS proxy to fetch URL content to avoid browser security restrictions.
+            const proxyUrl = 'https://api.allorigins.win/raw?url=';
+            const response = await fetch(`${proxyUrl}${encodeURIComponent(url)}`);
+
             if (!response.ok) {
-                throw new Error(`Failed to fetch URL: ${response.status} ${response.statusText}`);
+                throw new Error(`Failed to fetch URL content via proxy (${response.status} ${response.statusText}). The target website might be down or blocking requests.`);
             }
             const htmlContent = await response.text();
             
@@ -121,12 +122,7 @@ const App: React.FC = () => {
             setAuditResult(result);
         } catch (error) {
             const message = error instanceof Error ? error.message : 'An unknown error occurred.';
-            // Add a more helpful message for the likely CORS issue
-            if (message.includes('Failed to fetch')) {
-                 setAuditError("Failed to fetch the URL due to browser security (CORS policy). For a real application, this should be handled by a backend proxy. For local testing, you can use a browser extension to disable CORS.");
-            } else {
-                setAuditError(message);
-            }
+            setAuditError(message);
         } finally {
             setIsAuditing(false);
         }
