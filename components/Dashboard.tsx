@@ -1,10 +1,21 @@
 import React from 'react';
-import { AiGeneratedAudit, User } from '../types';
+import { AiGeneratedAudit, User, AuditError } from '../types';
 import ScoreGauge from './ScoreGauge';
 import LockedFeatureCard from './LockedFeatureCard';
 import PrioritizedActionPlan from './PrioritizedActionPlan';
 import SuggestedSnippets from './SuggestedSnippets';
-import { GeminiIcon, PlusIcon } from './icons';
+import { 
+    GeminiIcon, 
+    PlusIcon, 
+    SaveIcon, 
+    ArrowUpIcon, 
+    ArrowDownIcon, 
+    PlusCircleIcon, 
+    CheckCircleIcon,
+    ActionPlanIcon,
+    SnippetsIcon,
+    ErrorIcon
+} from './icons';
 import { IssueRow } from './IssueRow';
 
 interface DashboardProps {
@@ -12,18 +23,20 @@ interface DashboardProps {
     auditedUrl: string;
     auditResult: AiGeneratedAudit | null;
     isAuditing: boolean;
-    auditError: string | null;
+    auditError: AuditError | null;
     onNewAuditClick: () => void;
+    onSaveReport: () => void;
+    comparisonResult: AiGeneratedAudit | null;
 }
 
-const Dashboard: React.FC<DashboardProps> = ({ currentUser, auditedUrl, auditResult, isAuditing, auditError, onNewAuditClick }) => {
+const Dashboard: React.FC<DashboardProps> = ({ currentUser, auditedUrl, auditResult, isAuditing, auditError, onNewAuditClick, onSaveReport, comparisonResult }) => {
     
     if (isAuditing) {
         return <LoadingState />;
     }
 
     if (auditError) {
-        return <ErrorState message={auditError} onRetryClick={onNewAuditClick} />;
+        return <ErrorState error={auditError} onRetryClick={onNewAuditClick} />;
     }
     
     if (!auditResult || !auditedUrl) {
@@ -35,6 +48,19 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, auditedUrl, auditRes
 
     return (
         <div className="space-y-8">
+             <div className="flex justify-between items-center">
+                <div>
+                    {/* Placeholder for potential future actions */}
+                </div>
+                <button 
+                    onClick={onSaveReport} 
+                    className="flex items-center space-x-2 text-sm font-semibold text-auditor-primary hover:underline"
+                >
+                    <SaveIcon className="h-4 w-4" />
+                    <span>Save Report</span>
+                </button>
+            </div>
+            {comparisonResult && <ComparisonSummary current={auditResult} previous={comparisonResult} />}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 {/* Website Health Score */}
                 <div className="lg:col-span-1 bg-white dark:bg-auditor-card border border-gray-200 dark:border-auditor-border rounded-lg p-6 flex flex-col items-center justify-center text-center">
@@ -48,7 +74,7 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, auditedUrl, auditRes
                 <div className="lg:col-span-2 bg-white dark:bg-auditor-card border border-gray-200 dark:border-auditor-border rounded-lg p-6">
                     <div className="flex items-center space-x-2 text-gray-900 dark:text-auditor-text-primary mb-3">
                         <GeminiIcon className="h-6 w-6 text-auditor-primary"/>
-                        <h3 className="text-lg font-semibold">Gemini API Summary</h3>
+                        <h3 className="text-lg font-semibold">AI Summary</h3>
                     </div>
                     <p className="text-gray-500 dark:text-auditor-text-secondary text-sm leading-relaxed">{aiAnalysis.summary}</p>
                     {!currentUser.isPro && (
@@ -93,7 +119,7 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, auditedUrl, auditRes
                 ) : (
                     <LockedFeatureCard 
                         title="Prioritized Action Plan" 
-                        icon={<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-6 w-6"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>}
+                        icon={<ActionPlanIcon className="h-6 w-6" />}
                         description="AI-generated step-by-step plan to tackle the most critical issues first, saving you time and effort."
                     />
                 )}
@@ -102,10 +128,53 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, auditedUrl, auditRes
                 ) : (
                     <LockedFeatureCard
                         title="Suggested HTML Snippets"
-                        icon={<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-6 w-6"><polyline points="16 18 22 12 16 6"></polyline><polyline points="8 6 2 12 8 18"></polyline></svg>}
+                        icon={<SnippetsIcon className="h-6 w-6" />}
                         description="Get auto-generated code snippets to fix issues like missing meta tags, incorrect schema, and more."
                     />
                 )}
+            </div>
+        </div>
+    );
+};
+
+const ComparisonSummary: React.FC<{current: AiGeneratedAudit, previous: AiGeneratedAudit}> = ({ current, previous }) => {
+    const scoreDiff = current.auditReport.score - previous.auditReport.score;
+    const previousIssueIds = new Set(previous.auditReport.issues.map(i => i.id));
+    const currentIssueIds = new Set(current.auditReport.issues.map(i => i.id));
+    
+    const newIssues = current.auditReport.issues.filter(i => !previousIssueIds.has(i.id)).length;
+    const resolvedIssues = previous.auditReport.issues.filter(i => !currentIssueIds.has(i.id)).length;
+
+    return (
+        <div className="bg-white dark:bg-auditor-card border border-gray-200 dark:border-auditor-border rounded-lg p-6">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-auditor-text-primary mb-4">Comparison to Last Report</h3>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
+                <div>
+                    <div className={`flex items-center justify-center text-2xl font-bold ${scoreDiff > 0 ? 'text-auditor-secondary' : scoreDiff < 0 ? 'text-severity-high' : 'text-auditor-text-primary'}`}>
+                        {scoreDiff > 0 && <ArrowUpIcon className="h-5 w-5 mr-1" />}
+                        {scoreDiff < 0 && <ArrowDownIcon className="h-5 w-5 mr-1" />}
+                        {scoreDiff > 0 ? '+' : ''}{scoreDiff}
+                    </div>
+                    <p className="text-sm text-gray-500 dark:text-auditor-text-secondary mt-1">Score Change</p>
+                </div>
+                 <div>
+                    <p className="text-2xl font-bold text-auditor-text-primary">{current.auditReport.issues.length}</p>
+                    <p className="text-sm text-gray-500 dark:text-auditor-text-secondary mt-1">Total Issues</p>
+                </div>
+                <div>
+                    <div className="flex items-center justify-center text-2xl font-bold text-severity-high">
+                        <PlusCircleIcon className="h-5 w-5 mr-1" />
+                        {newIssues}
+                    </div>
+                    <p className="text-sm text-gray-500 dark:text-auditor-text-secondary mt-1">New Issues</p>
+                </div>
+                <div>
+                    <div className="flex items-center justify-center text-2xl font-bold text-auditor-secondary">
+                        <CheckCircleIcon className="h-5 w-5 mr-1" />
+                        {resolvedIssues}
+                    </div>
+                    <p className="text-sm text-gray-500 dark:text-auditor-text-secondary mt-1">Resolved Issues</p>
+                </div>
             </div>
         </div>
     );
@@ -134,22 +203,42 @@ const LoadingState = () => (
         <GeminiIcon className="h-12 w-12 text-auditor-primary animate-spin" />
         <h2 className="text-xl font-semibold text-gray-900 dark:text-auditor-text-primary mt-4">Analyzing Website...</h2>
         <p className="text-gray-500 dark:text-auditor-text-secondary mt-2">
-            The Gemini API is generating your comprehensive audit. This may take a moment.
+            The AI is generating your comprehensive audit. This may take a moment.
         </p>
     </div>
 );
 
-const ErrorState: React.FC<{ message: string; onRetryClick: () => void }> = ({ message, onRetryClick }) => (
+const ErrorState: React.FC<{ error: AuditError; onRetryClick: () => void }> = ({ error, onRetryClick }) => {
+    const getGuidance = () => {
+        switch (error.type) {
+            case 'api_key':
+                return <>Please verify your API Key in the <a href="#" onClick={(e) => { e.preventDefault(); /* This should navigate to settings */}} className="font-semibold underline hover:text-auditor-primary">Settings page</a> or try a different AI provider.</>;
+            case 'url_fetch':
+                 return "The URL could not be reached. Please check if the URL is correct, publicly accessible, and not blocking automated requests.";
+            case 'network':
+                return "A network connection could not be established. Please check your internet connection and any firewall or proxy settings.";
+            case 'safety':
+                return "The request was blocked by the AI provider's safety filters. This can happen with sensitive or controversial topics. Please try a different URL.";
+            case 'parsing':
+                return "The AI provider returned an unexpected response that could not be read. This may be a temporary issue. Trying again may help.";
+            default:
+                return "An unexpected error occurred. Check the developer console for more technical details.";
+        }
+    }
+    
+    return (
      <div className="flex flex-col items-center justify-center text-center h-full max-w-md mx-auto bg-white dark:bg-auditor-card border border-red-500/30 dark:border-severity-high/50 rounded-lg p-8">
-        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-12 w-12 text-severity-high mb-4"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+        <ErrorIcon className="h-12 w-12 text-severity-high mb-4" />
         <h2 className="text-xl font-semibold text-gray-900 dark:text-auditor-text-primary">Audit Failed</h2>
-        <p className="text-gray-500 dark:text-auditor-text-secondary mt-2 mb-6">
-            {message}
+        <p className="text-gray-500 dark:text-auditor-text-secondary mt-2 mb-2 font-medium">{error.message}</p>
+        <p className="text-gray-500 dark:text-auditor-text-secondary mt-1 mb-6 text-sm">
+            {getGuidance()}
         </p>
         <button onClick={onRetryClick} className="flex items-center space-x-2 bg-auditor-primary hover:bg-blue-600 text-white font-semibold px-4 py-2 rounded-lg transition-colors">
             <span>Try a New Audit</span>
         </button>
     </div>
-);
+    );
+};
 
 export default Dashboard;

@@ -72,3 +72,15 @@ export interface AiGeneratedAudit {
     auditReport: AuditReport;
     aiAnalysis: AiAnalysis;
 }
+
+export interface SavedAuditReport {
+    id: string; // A unique ID, e.g., from Date.now()
+    url: string;
+    savedAt: string; // ISO string date
+    auditResult: AiGeneratedAudit;
+}
+
+export interface AuditError {
+    type: 'api_key' | 'network' | 'url_fetch' | 'safety' | 'parsing' | 'unknown';
+    message: string;
+}

@@ -4,6 +4,7 @@ import { Issue, IssueSeverity } from '../types';
 interface IssueRowProps {
     issue: Issue;
     isLast: boolean;
+    comparisonStatus?: 'new' | 'resolved';
 }
 
 const severityClasses: Record<IssueSeverity, { bg: string, text: string }> = {
@@ -12,7 +13,7 @@ const severityClasses: Record<IssueSeverity, { bg: string, text: string }> = {
     [IssueSeverity.LOW]: { bg: 'bg-severity-low/10 dark:bg-severity-low/20', text: 'text-severity-low' },
 };
 
-export const IssueRow: React.FC<IssueRowProps> = ({ issue, isLast }) => {
+export const IssueRow: React.FC<IssueRowProps> = ({ issue, isLast, comparisonStatus }) => {
     const [isExpanded, setIsExpanded] = useState(false);
     const { title, severity, status, description, contextualSnippet, screenshotPlaceholderUrl } = issue;
     const severityClass = severityClasses[severity];
@@ -22,7 +23,13 @@ export const IssueRow: React.FC<IssueRowProps> = ({ issue, isLast }) => {
     return (
         <>
             <tr className={`${!isLast && !isExpanded ? 'border-b border-gray-200 dark:border-auditor-border' : ''}`}>
-                <td className="p-4 font-medium text-gray-900 dark:text-auditor-text-primary align-top">{title}</td>
+                <td className="p-4 font-medium text-gray-900 dark:text-auditor-text-primary align-top">
+                    <div className="flex items-center space-x-2">
+                        <span>{title}</span>
+                        {comparisonStatus === 'new' && <span className="px-2 py-0.5 text-xs font-semibold rounded-full bg-blue-100 dark:bg-auditor-primary/20 text-auditor-primary">New</span>}
+                        {comparisonStatus === 'resolved' && <span className="px-2 py-0.5 text-xs font-semibold rounded-full bg-green-100 dark:bg-auditor-secondary/20 text-auditor-secondary">Resolved</span>}
+                    </div>
+                </td>
                 <td className="p-4 align-top">
                     <span className={`px-2 py-1 text-xs font-semibold rounded-full ${severityClass.bg} ${severityClass.text}`}>
                         {severity}

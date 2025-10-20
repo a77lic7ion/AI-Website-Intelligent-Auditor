@@ -26,7 +26,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activePage, onNavigate, onLogout, cur
                 <NavItem icon={<SettingsIcon className="h-5 w-5" />} label="Settings" active={activePage === 'Settings'} onClick={() => onNavigate('Settings')} />
             </nav>
 
-            <div className="mt-auto">
+            <div className="mt-auto mb-2">
                  <div className="flex items-center space-x-3 p-2">
                     <img src="https://picsum.photos/id/237/200/200" alt="User Avatar" className="h-10 w-10 rounded-full" />
                     <div>

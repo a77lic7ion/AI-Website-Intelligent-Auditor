@@ -8,7 +8,7 @@ import Settings from './components/Settings';
 import NewAuditModal from './components/NewAuditModal';
 import Login from './components/Login';
 import SignUp from './components/SignUp';
-import { Page, User, AiGeneratedAudit, Theme, AiProvider } from './types';
+import { Page, User, AiGeneratedAudit, Theme, AiProvider, SavedAuditReport, AuditError } from './types';
 import { runAudit } from './geminiService';
 
 const App: React.FC = () => {
@@ -34,7 +34,11 @@ const App: React.FC = () => {
     const [auditResult, setAuditResult] = useState<AiGeneratedAudit | null>(null);
     const [auditedUrl, setAuditedUrl] = useState<string>('');
     const [isAuditing, setIsAuditing] = useState(false);
-    const [auditError, setAuditError] = useState<string | null>(null);
+    const [auditError, setAuditError] = useState<AuditError | null>(null);
+    
+    // Save & Compare State
+    const [savedReports, setSavedReports] = useState<SavedAuditReport[]>([]);
+    const [loadedReport, setLoadedReport] = useState<SavedAuditReport | null>(null);
 
     // Load saved data on initial render
     useEffect(() => {
@@ -54,6 +58,11 @@ const App: React.FC = () => {
         const savedTheme = localStorage.getItem('siteAuditorTheme') as Theme | null;
         if (savedTheme) {
             setTheme(savedTheme);
+        }
+        // Saved Reports
+        const reports = localStorage.getItem('siteAuditorSavedReports');
+        if (reports) {
+            setSavedReports(JSON.parse(reports));
         }
     }, []);
 
@@ -79,6 +88,7 @@ const App: React.FC = () => {
         setIsAuthenticated(false);
         setAuditResult(null);
         setAuditedUrl('');
+        setLoadedReport(null);
         setActivePage('Dashboard');
         localStorage.removeItem('siteAuditorUser');
     };
@@ -87,6 +97,39 @@ const App: React.FC = () => {
         setApiKeys(keys);
         localStorage.setItem('siteAuditorApiKeys', JSON.stringify(keys));
     };
+    
+    const handleSaveCurrentReport = () => {
+        if (!auditResult || !auditedUrl) return;
+        const newSavedReport: SavedAuditReport = {
+            id: Date.now().toString(),
+            url: auditedUrl,
+            savedAt: new Date().toISOString(),
+            auditResult: auditResult,
+        };
+        const updatedReports = [...savedReports, newSavedReport];
+        setSavedReports(updatedReports);
+        localStorage.setItem('siteAuditorSavedReports', JSON.stringify(updatedReports));
+    };
+
+    const handleLoadReport = (reportId: string) => {
+        const reportToLoad = savedReports.find(r => r.id === reportId);
+        if (reportToLoad) {
+            setLoadedReport(reportToLoad);
+            setAuditResult(reportToLoad.auditResult);
+            setAuditedUrl(reportToLoad.url);
+            setAuditError(null);
+            setActivePage('Dashboard');
+        }
+    };
+
+    const handleDeleteReport = (reportId: string) => {
+        const updatedReports = savedReports.filter(r => r.id !== reportId);
+        setSavedReports(updatedReports);
+        localStorage.setItem('siteAuditorSavedReports', JSON.stringify(updatedReports));
+        if (loadedReport?.id === reportId) {
+            setLoadedReport(null);
+        }
+    };
 
     const handleStartAudit = async (url: string, provider: AiProvider) => {
         setIsNewAuditModalOpen(false);
@@ -94,35 +137,48 @@ const App: React.FC = () => {
         setIsAuditing(true);
         setAuditError(null);
         setAuditedUrl(url);
+        // If the new URL is different from the loaded report, clear the comparison
+        if (loadedReport && loadedReport.url !== url) {
+            setLoadedReport(null);
+        }
         setAuditResult(null);
 
         const apiKey = apiKeys[provider];
         if (!apiKey && provider !== AiProvider.OLLAMA) {
-             setAuditError(`API Key for ${provider} is not set. Please add it in Settings.`);
+             setAuditError({ type: 'api_key', message: `API Key for ${provider} is not set. Please add it in Settings.`});
              setIsAuditing(false);
              return;
         }
         if (!apiKeys[AiProvider.OLLAMA] && provider === AiProvider.OLLAMA) {
-            setAuditError(`Ollama Server URL is not set. Please add it in Settings.`);
+            setAuditError({ type: 'api_key', message: `Ollama Server URL is not set. Please add it in Settings.`});
             setIsAuditing(false);
             return;
         }
 
         try {
-            // Use a CORS proxy to fetch URL content to avoid browser security restrictions.
             const proxyUrl = 'https://api.allorigins.win/raw?url=';
             const response = await fetch(`${proxyUrl}${encodeURIComponent(url)}`);
 
             if (!response.ok) {
-                throw new Error(`Failed to fetch URL content via proxy (${response.status} ${response.statusText}). The target website might be down or blocking requests.`);
+                throw { type: 'url_fetch', message: `Failed to fetch URL content (${response.status} ${response.statusText}). The website may be down or blocking requests.` };
             }
             const htmlContent = await response.text();
             
             const result = await runAudit(provider, apiKey, url, htmlContent);
             setAuditResult(result);
-        } catch (error) {
-            const message = error instanceof Error ? error.message : 'An unknown error occurred.';
-            setAuditError(message);
+        } catch (error: any) {
+            if (error.type) { // If it's our custom error object
+                setAuditError(error as AuditError);
+            } else {
+                 const message = error instanceof Error ? error.message : 'An unknown error occurred.';
+                 if (message.includes('API key not valid')) {
+                     setAuditError({ type: 'api_key', message: `The ${provider} API Key is invalid or expired. Please check it in Settings.`});
+                 } else if (message.includes('NetworkError') || message.includes('Failed to fetch')) {
+                     setAuditError({ type: 'network', message: `A network error occurred. Please check your connection and try again.`});
+                 } else {
+                     setAuditError({ type: 'unknown', message });
+                 }
+            }
         } finally {
             setIsAuditing(false);
         }
@@ -130,6 +186,8 @@ const App: React.FC = () => {
 
     const renderPage = () => {
         if (!currentUser) return null;
+        const comparisonResult = (loadedReport && loadedReport.url === auditedUrl && loadedReport.auditResult !== auditResult) ? loadedReport.auditResult : null;
+
         switch (activePage) {
             case 'Dashboard':
                 return <Dashboard 
@@ -139,9 +197,17 @@ const App: React.FC = () => {
                     isAuditing={isAuditing}
                     auditError={auditError}
                     onNewAuditClick={() => setIsNewAuditModalOpen(true)}
+                    onSaveReport={handleSaveCurrentReport}
+                    comparisonResult={comparisonResult}
                 />;
             case 'Reports':
-                return <Reports auditResult={auditResult} />;
+                return <Reports 
+                    auditResult={auditResult}
+                    comparisonResult={comparisonResult}
+                    savedReports={savedReports}
+                    onLoadReport={handleLoadReport}
+                    onDeleteReport={handleDeleteReport}
+                 />;
             case 'Integrations':
                 return <Integrations />;
             case 'Settings':
