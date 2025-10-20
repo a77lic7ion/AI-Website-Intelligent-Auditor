@@ -1,0 +1,5 @@
+{
+  "name": "AI Website Intelligent Auditor",
+  "description": "An AI-powered tool that transforms complex technical website audits into prioritized, actionable plans with code suggestions. It provides a comprehensive analysis of performance, SEO, accessibility, security, and UI/UX best practices.",
+  "requestFramePermissions": []
+}
