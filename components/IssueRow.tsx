@@ -48,7 +48,7 @@ export const IssueRow: React.FC<IssueRowProps> = ({ issue, isLast }) => {
                             {contextualSnippet && contextualSnippet !== 'N/A' && (
                                 <div>
                                     <h4 className="font-semibold text-sm text-gray-900 dark:text-auditor-text-primary mb-1">Contextual Snippet</h4>
-                                    <pre className="bg-gray-200 dark:bg-auditor-border p-3 rounded-md text-xs text-gray-800 dark:text-auditor-text-primary overflow-x-auto">
+                                    <pre className="bg-gray-200 dark:bg-auditor-border p-3 rounded-md text-xs text-gray-800 dark:text-auditor-text-primary overflow-x-auto whitespace-pre-wrap break-words">
                                         <code>{contextualSnippet}</code>
                                     </pre>
                                 </div>
