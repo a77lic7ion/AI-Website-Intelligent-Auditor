@@ -1,44 +1,37 @@
-
-import React, { useState, useEffect } from 'react';
-import { MOCK_AUDIT_REPORT } from '../constants';
-import { AiAnalysis, AuditReport, Issue, IssueSeverity, User } from '../types';
+import React from 'react';
+import { AiGeneratedAudit, User } from '../types';
 import ScoreGauge from './ScoreGauge';
 import LockedFeatureCard from './LockedFeatureCard';
 import PrioritizedActionPlan from './PrioritizedActionPlan';
 import SuggestedSnippets from './SuggestedSnippets';
-import { getAuditAnalysis } from '../geminiService';
-import { GeminiIcon } from './icons';
-
+import { GeminiIcon, PlusIcon } from './icons';
+import { IssueRow } from './IssueRow';
 
 interface DashboardProps {
     currentUser: User;
-    auditTrigger: number;
     auditedUrl: string;
+    auditResult: AiGeneratedAudit | null;
+    isAuditing: boolean;
+    auditError: string | null;
+    onNewAuditClick: () => void;
 }
 
-const Dashboard: React.FC<DashboardProps> = ({ currentUser, auditTrigger, auditedUrl }) => {
-    const [report] = useState<AuditReport>(MOCK_AUDIT_REPORT);
-    const [analysis, setAnalysis] = useState<AiAnalysis | null>(null);
-    const [loading, setLoading] = useState<boolean>(true);
+const Dashboard: React.FC<DashboardProps> = ({ currentUser, auditedUrl, auditResult, isAuditing, auditError, onNewAuditClick }) => {
+    
+    if (isAuditing) {
+        return <LoadingState />;
+    }
 
-    useEffect(() => {
-        const fetchAnalysis = async () => {
-            setLoading(true);
-            setAnalysis(null);
-            try {
-                // In a real app, you'd pass the auditedUrl to the service
-                const result = await getAuditAnalysis(report, auditedUrl);
-                setAnalysis(result);
-            } catch (error) {
-                console.error("Failed to get AI analysis:", error);
-            } finally {
-                setLoading(false);
-            }
-        };
-        fetchAnalysis();
-    }, [report, auditTrigger, auditedUrl]);
+    if (auditError) {
+        return <ErrorState message={auditError} onRetryClick={onNewAuditClick} />;
+    }
+    
+    if (!auditResult || !auditedUrl) {
+        return <InitialState onNewAuditClick={onNewAuditClick} />;
+    }
 
-    const criticalIssues = report.issues.filter(issue => issue.severity === IssueSeverity.High || issue.severity === IssueSeverity.Medium).slice(0, 3);
+    const { auditReport, aiAnalysis } = auditResult;
+    const criticalIssues = auditReport.issues.filter(issue => issue.severity === 'High' || issue.severity === 'Medium').slice(0, 3);
 
     return (
         <div className="space-y-8">
@@ -46,8 +39,9 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, auditTrigger, audite
                 {/* Website Health Score */}
                 <div className="lg:col-span-1 bg-white dark:bg-auditor-card border border-gray-200 dark:border-auditor-border rounded-lg p-6 flex flex-col items-center justify-center text-center">
                     <h3 className="text-lg font-semibold text-gray-900 dark:text-auditor-text-primary mb-2">Website Health Score</h3>
-                    <ScoreGauge score={report.score} />
-                    <p className="mt-4 text-gray-500 dark:text-auditor-text-secondary text-sm">A good score, but there's room for improvement.</p>
+                    <p className="text-sm text-auditor-text-secondary mb-3 truncate w-full px-4" title={auditedUrl}>{auditedUrl}</p>
+                    <ScoreGauge score={auditReport.score} />
+                    <p className="mt-4 text-gray-500 dark:text-auditor-text-secondary text-sm">Based on {auditReport.issues.length} issues found.</p>
                 </div>
 
                 {/* Gemini API Summary */}
@@ -56,15 +50,7 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, auditTrigger, audite
                         <GeminiIcon className="h-6 w-6 text-auditor-primary"/>
                         <h3 className="text-lg font-semibold">Gemini API Summary</h3>
                     </div>
-                    {loading ? (
-                         <div className="space-y-3 animate-pulse">
-                            <div className="h-4 bg-gray-200 dark:bg-auditor-border rounded w-full"></div>
-                            <div className="h-4 bg-gray-200 dark:bg-auditor-border rounded w-5/6"></div>
-                            <div className="h-4 bg-gray-200 dark:bg-auditor-border rounded w-3/4"></div>
-                         </div>
-                    ) : (
-                        <p className="text-gray-500 dark:text-auditor-text-secondary text-sm leading-relaxed">{analysis?.summary}</p>
-                    )}
+                    <p className="text-gray-500 dark:text-auditor-text-secondary text-sm leading-relaxed">{aiAnalysis.summary}</p>
                     {!currentUser.isPro && (
                         <div className="mt-4 p-3 bg-auditor-primary/10 rounded-lg flex items-center space-x-3">
                             <input type="radio" checked readOnly className="form-radio h-4 w-4 text-auditor-primary bg-gray-100 dark:bg-auditor-card border-gray-300 dark:border-auditor-border" />
@@ -102,8 +88,8 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, auditTrigger, audite
 
             {/* AI-Powered Solutions */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {currentUser.isPro && analysis ? (
-                    <PrioritizedActionPlan plan={analysis.prioritizedActionPlan} />
+                {currentUser.isPro && aiAnalysis ? (
+                    <PrioritizedActionPlan plan={aiAnalysis.prioritizedActionPlan} />
                 ) : (
                     <LockedFeatureCard 
                         title="Prioritized Action Plan" 
@@ -111,8 +97,8 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, auditTrigger, audite
                         description="AI-generated step-by-step plan to tackle the most critical issues first, saving you time and effort."
                     />
                 )}
-                {currentUser.isPro && analysis ? (
-                    <SuggestedSnippets snippets={analysis.suggestedSnippets} />
+                {currentUser.isPro && aiAnalysis ? (
+                    <SuggestedSnippets snippets={aiAnalysis.suggestedSnippets} />
                 ) : (
                     <LockedFeatureCard
                         title="Suggested HTML Snippets"
@@ -125,48 +111,45 @@ const Dashboard: React.FC<DashboardProps> = ({ currentUser, auditTrigger, audite
     );
 };
 
-const IssueRow: React.FC<{ issue: Issue; isLast: boolean }> = ({ issue, isLast }) => {
-    const [isExpanded, setIsExpanded] = useState(false);
-    const severityClasses = {
-        [IssueSeverity.High]: 'bg-severity-high/20 text-severity-high',
-        [IssueSeverity.Medium]: 'bg-severity-medium/20 text-severity-medium',
-        [IssueSeverity.Low]: 'bg-severity-low/20 text-severity-low',
-    };
+const InitialState: React.FC<{onNewAuditClick: () => void}> = ({ onNewAuditClick }) => (
+    <div className="flex flex-col items-center justify-center text-center h-full max-w-md mx-auto">
+         <div className="bg-auditor-primary/10 p-4 rounded-full mb-4">
+             <div className="bg-auditor-primary/20 p-3 rounded-full">
+                <GeminiIcon className="h-8 w-8 text-auditor-primary" />
+             </div>
+         </div>
+        <h2 className="text-xl font-semibold text-gray-900 dark:text-auditor-text-primary">Welcome to Site Auditor</h2>
+        <p className="text-gray-500 dark:text-auditor-text-secondary mt-2 mb-6">
+            Get started by running your first AI-powered website audit. Enter a URL to receive a comprehensive analysis of its performance, SEO, accessibility, and more.
+        </p>
+        <button onClick={onNewAuditClick} className="flex items-center space-x-2 bg-auditor-primary hover:bg-blue-600 text-white font-semibold px-4 py-2 rounded-lg transition-colors">
+            <PlusIcon className="h-5 w-5" />
+            <span>Start Your First Audit</span>
+        </button>
+    </div>
+);
 
-    return (
-        <>
-            <tr className={!isExpanded && !isLast ? 'border-b border-gray-200 dark:border-auditor-border' : ''}>
-                <td className="p-4 font-medium text-gray-900 dark:text-auditor-text-primary">{issue.title}</td>
-                <td className="p-4">
-                    <span className={`px-2 py-1 rounded-full font-semibold text-xs ${severityClasses[issue.severity]}`}>
-                        {issue.severity}
-                    </span>
-                </td>
-                <td className="p-4">
-                    <span className="px-2 py-1 rounded-full font-semibold text-xs bg-status-open/20 text-status-open">
-                        {issue.status}
-                    </span>
-                </td>
-                <td className="p-4">
-                    <button onClick={() => setIsExpanded(!isExpanded)} className="font-semibold text-auditor-primary hover:underline focus:outline-none">
-                        {isExpanded ? 'Hide Details' : 'View Details'}
-                    </button>
-                </td>
-            </tr>
-            {isExpanded && (
-                <tr className={!isLast ? 'border-b border-gray-200 dark:border-auditor-border' : ''}>
-                    <td colSpan={4} className="p-4 pl-8 bg-gray-50 dark:bg-auditor-dark/50">
-                        <div>
-                            <p className="font-semibold text-gray-900 dark:text-auditor-text-primary mb-1">Details</p>
-                            <p className="text-sm text-gray-700 dark:text-auditor-text-secondary leading-relaxed">
-                                {issue.description}
-                            </p>
-                        </div>
-                    </td>
-                </tr>
-            )}
-        </>
-    );
-};
+const LoadingState = () => (
+    <div className="flex flex-col items-center justify-center text-center h-full">
+        <GeminiIcon className="h-12 w-12 text-auditor-primary animate-spin" />
+        <h2 className="text-xl font-semibold text-gray-900 dark:text-auditor-text-primary mt-4">Analyzing Website...</h2>
+        <p className="text-gray-500 dark:text-auditor-text-secondary mt-2">
+            The Gemini API is generating your comprehensive audit. This may take a moment.
+        </p>
+    </div>
+);
+
+const ErrorState: React.FC<{ message: string; onRetryClick: () => void }> = ({ message, onRetryClick }) => (
+     <div className="flex flex-col items-center justify-center text-center h-full max-w-md mx-auto bg-white dark:bg-auditor-card border border-red-500/30 dark:border-severity-high/50 rounded-lg p-8">
+        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-12 w-12 text-severity-high mb-4"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+        <h2 className="text-xl font-semibold text-gray-900 dark:text-auditor-text-primary">Audit Failed</h2>
+        <p className="text-gray-500 dark:text-auditor-text-secondary mt-2 mb-6">
+            {message}
+        </p>
+        <button onClick={onRetryClick} className="flex items-center space-x-2 bg-auditor-primary hover:bg-blue-600 text-white font-semibold px-4 py-2 rounded-lg transition-colors">
+            <span>Try a New Audit</span>
+        </button>
+    </div>
+);
 
 export default Dashboard;

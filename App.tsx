@@ -8,16 +8,22 @@ import Reports from './components/Reports';
 import Login from './components/Login';
 import SignUp from './components/SignUp';
 import NewAuditModal from './components/NewAuditModal';
-import { Page, Theme, User } from './types';
+import { Page, Theme, User, AiGeneratedAudit } from './types';
+import { generateAudit } from './geminiService';
 
 const App: React.FC = () => {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [authPage, setAuthPage] = useState<'login' | 'signup'>('login');
   const [activePage, setActivePage] = useState<Page>('Dashboard');
   const [theme, setTheme] = useState<Theme>(() => (localStorage.getItem('theme') as Theme) || 'system');
-  const [auditTrigger, setAuditTrigger] = useState(0);
+  
   const [isNewAuditModalOpen, setIsNewAuditModalOpen] = useState(false);
-  const [auditedUrl, setAuditedUrl] = useState('https://example-audited-site.com');
+  const [auditedUrl, setAuditedUrl] = useState('');
+  
+  const [auditResult, setAuditResult] = useState<AiGeneratedAudit | null>(null);
+  const [isAuditing, setIsAuditing] = useState(false);
+  const [auditError, setAuditError] = useState<string | null>(null);
+
 
   useEffect(() => {
     const root = window.document.documentElement;
@@ -43,14 +49,28 @@ const App: React.FC = () => {
 
   const handleLogout = () => {
     setCurrentUser(null);
-    setAuthPage('login'); // Reset to login page on logout
+    setAuthPage('login'); 
+    setAuditResult(null);
+    setAuditedUrl('');
   };
 
-  const handleStartAudit = (url: string) => {
+  const handleStartAudit = async (url: string) => {
     setAuditedUrl(url);
-    setAuditTrigger(prev => prev + 1);
     setIsNewAuditModalOpen(false);
-    setActivePage('Dashboard'); // Switch to dashboard to see results
+    setActivePage('Dashboard');
+    setIsAuditing(true);
+    setAuditError(null);
+    setAuditResult(null);
+
+    try {
+      const result = await generateAudit(url);
+      setAuditResult(result);
+    } catch (error) {
+      console.error("Audit generation failed:", error);
+      setAuditError("Failed to generate the audit. The Gemini API might be unavailable or the URL may be inaccessible. Please check the console for more details.");
+    } finally {
+      setIsAuditing(false);
+    }
   };
   
   if (!currentUser) {
@@ -62,7 +82,7 @@ const App: React.FC = () => {
   }
 
   const pageDetails = {
-    Dashboard: { title: 'Website Audit Results', subtitle: `Results for ${auditedUrl}` },
+    Dashboard: { title: 'Website Audit Results', subtitle: auditedUrl ? `Results for ${auditedUrl}` : 'Start an audit to see results' },
     Reports: { title: 'Reports', subtitle: 'View and export your audit reports' },
     Integrations: { title: 'Integrations', subtitle: 'Connect with other services' },
     Settings: { title: 'Settings', subtitle: 'Manage your account and preferences' },
@@ -71,9 +91,16 @@ const App: React.FC = () => {
   const renderContent = () => {
     switch (activePage) {
       case 'Dashboard':
-        return <Dashboard currentUser={currentUser} auditTrigger={auditTrigger} auditedUrl={auditedUrl} />;
+        return <Dashboard 
+                  currentUser={currentUser} 
+                  auditedUrl={auditedUrl} 
+                  auditResult={auditResult}
+                  isAuditing={isAuditing}
+                  auditError={auditError}
+                  onNewAuditClick={() => setIsNewAuditModalOpen(true)}
+                />;
       case 'Reports':
-        return <Reports />;
+        return <Reports auditResult={auditResult} />;
       case 'Settings':
         return <Settings theme={theme} setTheme={setTheme} />;
       case 'Integrations':

@@ -1,4 +1,4 @@
-
+// FIX: Removed self-import causing declaration conflicts. The file was importing types from itself.
 export enum IssueSeverity {
   High = 'High',
   Medium = 'Medium',
@@ -48,6 +48,12 @@ export interface AiAnalysis {
       language: string;
   }[];
 }
+
+export interface AiGeneratedAudit {
+    auditReport: AuditReport;
+    aiAnalysis: AiAnalysis;
+}
+
 
 export interface User {
     fullName: string;

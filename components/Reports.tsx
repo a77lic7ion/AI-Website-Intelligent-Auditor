@@ -1,42 +1,57 @@
-
-import React, { useState } from 'react';
+import React from 'react';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import { MOCK_AUDIT_REPORT } from '../constants';
-import { PillarCategory, Issue, IssueSeverity } from '../types';
-import { ExportIcon } from './icons';
+import { PillarCategory, AiGeneratedAudit } from '../types';
+import { ExportIcon, ReportsIcon } from './icons';
+import { IssueRow } from './IssueRow';
 
-const Reports: React.FC = () => {
-    const report = MOCK_AUDIT_REPORT;
+interface ReportsProps {
+    auditResult: AiGeneratedAudit | null;
+}
+
+const Reports: React.FC<ReportsProps> = ({ auditResult }) => {
+    
+    if (!auditResult) {
+        return (
+            <div className="flex flex-col items-center justify-center text-center h-full max-w-md mx-auto">
+                <div className="bg-auditor-primary/10 p-4 rounded-full mb-4">
+                    <div className="bg-auditor-primary/20 p-3 rounded-full">
+                       <ReportsIcon className="h-8 w-8 text-auditor-primary" />
+                    </div>
+                </div>
+               <h2 className="text-xl font-semibold text-gray-900 dark:text-auditor-text-primary">No Report Available</h2>
+               <p className="text-gray-500 dark:text-auditor-text-secondary mt-2">
+                   Please run an audit from the dashboard to generate a report. Once an audit is complete, the full report will be displayed here.
+               </p>
+           </div>
+        );
+    }
+    
+    const { auditReport } = auditResult;
     const categories = Object.values(PillarCategory);
 
     const handleExportPDF = () => {
         const doc = new jsPDF();
         
-        // Header
         doc.setFontSize(22);
         doc.setFont('helvetica', 'bold');
         doc.text('Site Audit Report', 14, 22);
         
-        // Sub-header
         doc.setFontSize(12);
         doc.setFont('helvetica', 'normal');
         doc.setTextColor(100);
         doc.text(`Generated on: ${new Date().toLocaleDateString()}`, 14, 30);
 
-        // Summary Stats
         doc.setFontSize(14);
         doc.setTextColor(0);
-        doc.text(`Overall Health Score: ${report.score} / 100`, 14, 45);
-        doc.text(`Total Pages Scanned: ${report.scannedPages}`, 14, 52);
+        doc.text(`Overall Health Score: ${auditReport.score} / 100`, 14, 45);
+        doc.text(`Total Pages Scanned: ${auditReport.scannedPages}`, 14, 52);
 
         let startY = 65;
 
         categories.forEach(category => {
-            const categoryIssues = report.issues.filter(issue => issue.category === category);
-            if (categoryIssues.length === 0) {
-                return;
-            }
+            const categoryIssues = auditReport.issues.filter(issue => issue.category === category);
+            if (categoryIssues.length === 0) return;
 
             const tableBody = categoryIssues.map(issue => [
                 issue.title,
@@ -46,17 +61,10 @@ const Reports: React.FC = () => {
 
             autoTable(doc, {
                 head: [[`${category} Issues`]],
-                body: [
-                    [{ content: '', styles: { cellPadding: 0, minCellHeight: 0 } }]
-                ],
+                body: [[{ content: '', styles: { cellPadding: 0, minCellHeight: 0 } }]],
                 startY,
                 theme: 'plain',
-                headStyles: {
-                    fontSize: 16,
-                    fontStyle: 'bold',
-                    textColor: '#0D1117',
-                    fillColor: false
-                }
+                headStyles: { fontSize: 16, fontStyle: 'bold', textColor: '#0D1117', fillColor: false }
             });
             
             const tableStartY = (doc as any).lastAutoTable.finalY - 5;
@@ -66,18 +74,9 @@ const Reports: React.FC = () => {
                 body: tableBody,
                 startY: tableStartY,
                 theme: 'grid',
-                headStyles: {
-                    fillColor: [47, 129, 247], // auditor-primary color
-                    textColor: [255, 255, 255],
-                },
-                styles: {
-                    fontSize: 10,
-                },
-                columnStyles: {
-                    0: { cellWidth: 100 },
-                    1: { cellWidth: 30 },
-                    2: { cellWidth: 30 },
-                }
+                headStyles: { fillColor: [47, 129, 247], textColor: [255, 255, 255] },
+                styles: { fontSize: 10 },
+                columnStyles: { 0: { cellWidth: 100 }, 1: { cellWidth: 30 }, 2: { cellWidth: 30 } }
             });
 
             startY = (doc as any).lastAutoTable.finalY + 15;
@@ -92,7 +91,7 @@ const Reports: React.FC = () => {
                 <div>
                     <h1 className="text-2xl font-bold text-gray-900 dark:text-auditor-text-primary">Full Audit Report</h1>
                     <p className="text-gray-500 dark:text-auditor-text-secondary mt-1">
-                        A comprehensive list of all issues found during the audit.
+                        A comprehensive list of all {auditReport.issues.length} issues found during the audit.
                     </p>
                 </div>
                 <button 
@@ -105,7 +104,7 @@ const Reports: React.FC = () => {
             </div>
 
             {categories.map(category => {
-                const categoryIssues = report.issues.filter(issue => issue.category === category);
+                const categoryIssues = auditReport.issues.filter(issue => issue.category === category);
                 if (categoryIssues.length === 0) return null;
 
                 return (
@@ -136,50 +135,5 @@ const Reports: React.FC = () => {
         </div>
     );
 };
-
-const IssueRow: React.FC<{ issue: Issue; isLast: boolean }> = ({ issue, isLast }) => {
-    const [isExpanded, setIsExpanded] = useState(false);
-    const severityClasses = {
-        [IssueSeverity.High]: 'bg-severity-high/20 text-severity-high',
-        [IssueSeverity.Medium]: 'bg-severity-medium/20 text-severity-medium',
-        [IssueSeverity.Low]: 'bg-severity-low/20 text-severity-low',
-    };
-
-    return (
-        <>
-            <tr className={!isExpanded && !isLast ? 'border-b border-gray-200 dark:border-auditor-border' : ''}>
-                <td className="p-4 font-medium text-gray-900 dark:text-auditor-text-primary">{issue.title}</td>
-                <td className="p-4">
-                    <span className={`px-2 py-1 rounded-full font-semibold text-xs ${severityClasses[issue.severity]}`}>
-                        {issue.severity}
-                    </span>
-                </td>
-                <td className="p-4">
-                    <span className="px-2 py-1 rounded-full font-semibold text-xs bg-status-open/20 text-status-open">
-                        {issue.status}
-                    </span>
-                </td>
-                <td className="p-4">
-                    <button onClick={() => setIsExpanded(!isExpanded)} className="font-semibold text-auditor-primary hover:underline focus:outline-none">
-                        {isExpanded ? 'Hide Details' : 'View Details'}
-                    </button>
-                </td>
-            </tr>
-            {isExpanded && (
-                <tr className={!isLast ? 'border-b border-gray-200 dark:border-auditor-border' : ''}>
-                    <td colSpan={4} className="p-4 pl-8 bg-gray-50 dark:bg-auditor-dark/50">
-                        <div>
-                            <p className="font-semibold text-gray-900 dark:text-auditor-text-primary mb-1">Details</p>
-                            <p className="text-sm text-gray-700 dark:text-auditor-text-secondary leading-relaxed">
-                                {issue.description}
-                            </p>
-                        </div>
-                    </td>
-                </tr>
-            )}
-        </>
-    );
-};
-
 
 export default Reports;
